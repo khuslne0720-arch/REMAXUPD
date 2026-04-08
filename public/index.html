@@ -338,7 +338,7 @@
         </div>
         <div class="form-group" style="grid-column: 1/-1;">
           <label>Үнэ (төгрөгөөр)</label>
-          <input type="text" id="f_price" placeholder="150,000,000" />
+          <input type="text" id="f_price" placeholder="150,000,000" oninput="formatPrice(this)" />
         </div>
         <div class="form-group" style="grid-column: 1/-1;">
           <label>Агентын нэр</label>
@@ -347,12 +347,13 @@
       </div>
 
       <!-- Хамтран эзэмшигч (AI илрүүлсэн бол харуулна) -->
-      <div id="coownerBlock" style="display:none; margin-top:18px; padding:14px 16px; background:#eff6ff; border:1.5px solid #93c5fd; border-radius:8px;">
-        <div style="font-size:13px; font-weight:700; color:#1a3c5e; margin-bottom:4px;">
-          👥 Хамтран эзэмшигч илрүүлсэн
-          <span id="ownerCountBadge" style="background:#1a3c5e;color:#fff;border-radius:12px;padding:2px 10px;font-size:11px;margin-left:8px;"></span>
+      <div id="coownerBlock" style="display:none; margin-top:18px; padding:16px 18px; background:#eff6ff; border:2px solid #3b82f6; border-radius:10px;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
+          <span style="font-size:20px;">👥</span>
+          <span style="font-size:15px; font-weight:700; color:#1a3c5e;">Хамтран эзэмшигч илрүүлсэн</span>
+          <span id="ownerCountBadge" style="background:#1d4ed8;color:#fff;border-radius:20px;padding:4px 14px;font-size:13px;font-weight:700;"></span>
         </div>
-        <div style="font-size:12px;color:#3b82f6;margin-bottom:12px;">AI гэрчилгээнээс автоматаар авсан — шалгаж засна уу</div>
+        <div style="font-size:12px;color:#3b82f6;margin-bottom:14px;">AI гэрчилгээнээс автоматаар авсан — шалгаж засна уу</div>
         <div class="form-grid">
           <div class="form-group">
             <label>2-р эзэмшигчийн нэр <span class="ai-badge" id="badge_name2"></span></label>
@@ -644,7 +645,13 @@
   }
 
   // ── Generate ──
+  function formatPrice(input) {
+    const raw = input.value.replace(/[^0-9]/g, '');
+    input.value = raw ? Number(raw).toLocaleString('mn-MN') : '';
+  }
+
   async function generateContract() {
+    const rawPrice = document.getElementById('f_price').value.replace(/[^0-9]/g, '');
     const data = {
       name:       document.getElementById('f_name').value.trim(),
       register:   document.getElementById('f_register').value.trim(),
@@ -653,7 +660,7 @@
       cert:       document.getElementById('f_cert').value.trim(),
       phone:      document.getElementById('f_phone').value.trim(),
       email:      document.getElementById('f_email').value.trim(),
-      price:      document.getElementById('f_price').value.trim(),
+      price:      rawPrice,
       agent:      document.getElementById('f_agent').value.trim(),
       name2:      document.getElementById('f_name2')?.value.trim()    || extractedData.name2      || '',
       register2:  document.getElementById('f_register2')?.value.trim() || extractedData.register2  || '',
