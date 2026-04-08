@@ -585,46 +585,23 @@
   // ── Generate ──
   async function generateContract() {
     const data = {
-      name:     document.getElementById('f_name').value.trim(),
-      register: document.getElementById('f_register').value.trim(),
-      address:  document.getElementById('f_address').value.trim(),
-      area:     document.getElementById('f_area').value.trim(),
-      cert:     document.getElementById('f_cert').value.trim(),
-      phone:    document.getElementById('f_phone').value.trim(),
-      email:    document.getElementById('f_email').value.trim(),
-      price:    document.getElementById('f_price').value.trim(),
-      agent:    document.getElementById('f_agent').value.trim(),
+      name:       document.getElementById('f_name').value.trim(),
+      register:   document.getElementById('f_register').value.trim(),
+      address:    document.getElementById('f_address').value.trim(),
+      area:       document.getElementById('f_area').value.trim(),
+      cert:       document.getElementById('f_cert').value.trim(),
+      phone:      document.getElementById('f_phone').value.trim(),
+      email:      document.getElementById('f_email').value.trim(),
+      price:      document.getElementById('f_price').value.trim(),
+      agent:      document.getElementById('f_agent').value.trim(),
+      name2:      extractedData.name2      || '',
+      register2:  extractedData.register2  || '',
+      ownerCount: extractedData.ownerCount || '',
+      purpose:    extractedData.purpose    || '',
     };
 
-    setGenerating(true);
-    try {
-      const res = await fetch('/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: contractType, subtype: contractSubtype, data })
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Үүсгэхэд алдаа гарлаа');
-      }
-
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `contract_${contractType}_${contractSubtype}_${Date.now()}.docx`;
-      a.click();
-      URL.revokeObjectURL(url);
-
-      showSection(4);
-      markStep(3, 'done');
-      markStep(4, 'active');
-    } catch (err) {
-      showError(err.message);
-    } finally {
-      setGenerating(false);
-    }
+    const encoded = encodeURIComponent(JSON.stringify(data));
+    window.location.href = `/preview.html?type=${contractType}&subtype=${contractSubtype}&data=${encoded}`;
   }
 
   function setGenerating(on) {
