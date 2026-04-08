@@ -116,7 +116,6 @@ app.post('/analyze', analyzeLimiter, upload.single('image'), async (req, res) =>
   if (!req.file) return res.status(400).json({ error: 'No image uploaded' });
   try {
     let imageBuffer = fs.readFileSync(req.file.path);
-    // Зургийг OCR-д зориулж сайжруулах: resize + grayscale + contrast + sharpen
     let sharpImg = sharp(imageBuffer);
     const meta = await sharpImg.metadata();
     if (meta.width > 3500 || meta.height > 3500) {
@@ -129,101 +128,96 @@ app.post('/analyze', analyzeLimiter, upload.single('image'), async (req, res) =>
       .jpeg({ quality: 95 })
       .toBuffer();
     const base64Image = imageBuffer.toString('base64');
-    const mimeType = 'image/jpeg';
-    const prompt = [
-      'You are an expert OCR specialist for official Mongolian government property certificates (үл хөдлөх хөрөнгийн гэрчилгээ).',
-      'These certificates use a SPECIAL DECORATIVE CALLIGRAPHIC FONT that is unique to official Mongolian documents.',
-      'This font has specific visual characteristics that commonly cause OCR errors. Apply the corrections below.',
+
+    // ── АЛХАМ 1: Зургаас бүх текстийг үсэг үсгээр уншуулах ──
+    const ocrPrompt = [
+      'You are a precise OCR engine for official Mongolian government property certificates.',
+      'These certificates use a special decorative calligraphic font. Read EVERY character with maximum care.',
       '',
-      'Return ONLY this JSON, no explanation, no markdown:',
-      '{"name":"","register":"","name2":"","register2":"","ownerCount":"","address":"","area":"","cert":"","purpose":""}',
+      'CRITICAL font confusion pairs in this font — examine each character carefully:',
+      '  Ц vs У — Ц has a small descender/tail at bottom-right corner. У does not.',
+      '  Т vs П — Т has ONE vertical stroke down from center. П has TWO vertical strokes.',
+      '  я vs л — я has a curved top leaning right. л has a straight diagonal.',
+      '  лм cluster — do not skip л when it appears before м (e.g. Тэлмэн, not Тэмэн).',
+      '  ц vs з — ц has a tail at bottom-right. з does not.',
+      '  э vs о — э opens to the right. о is fully closed.',
+      '  н vs и — н has a connecting bar in the MIDDLE. и has it at the TOP.',
+      '  ү vs у — ү has TWO dots above. у has none.',
+      '  ө vs о — ө has TWO dots above. о has none.',
       '',
-      '--- FONT DISAMBIGUATION RULES (apply to ALL text reading) ---',
-      '',
-      'This decorative font commonly causes these specific confusions. Always check:',
-      '  "ц" vs "у" — CRITICAL: Ц has a small tail/descender at bottom-right, У does not. Register prefixes like ЦБ are often misread as УБ.',
-      '  "т" vs "п" — CRITICAL: Т has a single vertical stroke, П has two vertical strokes. УТ is often misread as УП.',
-      '  "я" vs "л" — CRITICAL: я curves to the right at top, л has a straight diagonal. "Баяр" is often misread as "Балр".',
-      '  "лм" cluster — the letter л before м can be missed entirely. "Тэлмэн" may be misread as "Тэмэн".',
-      '  "ц" vs "з" — цэцэг has TWO ц letters (not з)',
-      '  "э" vs "о" — look at the opening direction of the curve',
-      '  "н" vs "и" — н has a crossbar in the middle, и has it at the top',
-      '  "г" vs "т" — г curves down-right, т has a horizontal top',
-      '  "ү" vs "у" — ү has an umlaut (two dots), у does not',
-      '  "ө" vs "о" — ө has an umlaut (two dots), о does not',
-      '  "л" vs "д" — very similar in this font, check the base stroke',
-      '  Tall decorative strokes on letters like "б","д","р" can be misread as other letters',
-      '',
-      'REGISTER PREFIX SPECIAL RULES:',
-      '  The first 2 letters of a register are ALWAYS Cyrillic uppercase.',
-      '  Most common real prefixes: УБ, ЦБ, УЛ, УО, ИЦ, АА, ОУ, БА, ДА, УТ, НУ, ЖН',
-      '  NEVER write УП — "П" almost never appears as a register prefix. If you read УП, it is most likely УТ.',
-      '  NEVER confuse Ц with У — look carefully at the bottom of the letter for the Ц tail.',
-      '',
-      'COMMON MONGOLIAN FIRST NAMES — if you read something that does not match a real Mongolian name,',
-      'reconsider your reading using these frequent name components:',
-      '  Endings: -цэцэг, -нүүр, -сүрэн, -баяр, -болд, -мөнх, -гэрэл, -наран, -өлзий, -сайхан,',
-      '           -хүү, -баатар, -дорж, -жаргал, -мягмар, -энхэ, -зул, -уянга, -дулам, -номин',
-      '  Prefixes: Алтан-, Номун-, Энх-, Мөнх-, Баян-, Түмэн-, Дэлгэр-, Эрдэнэ-, Ган-, Түвшин-',
-      '',
-      '--- FIELD RULES ---',
-      '',
-      'ownerCount: Find the text in format "/X иргэний өмч/" or "/хоёр иргэний өмч/".',
-      '  Examples: "/нэг иргэний өмч/" → "1", "/хоёр иргэний өмч/" → "2", "/гурав иргэний өмч/" → "3"',
-      '  This text is usually at the end of the owner section.',
-      '',
-      'OWNER NAMES - Two patterns exist:',
-      '',
-      'PATTERN A - "овогтой" (single surname word):',
-      '  "...овгийн [SURNAME] овогтой [FIRSTNAME] [REGISTER]"',
-      '  Take ONLY the word immediately before "овогтой" as surname.',
-      '  Example: "Иижэн овгийн Дэмбэрэлсамбуу овогтой Алтанцэцэг УБ56050863"',
-      '  → name="Дэмбэрэлсамбуу Алтанцэцэг", register="УБ56050863"',
-      '  NOTE: "Алтанцэцэг" ends in -цэцэг (flower), NOT -нүүрс or -нүүр.',
-      '  After reading a name, ask yourself: is this a real Mongolian name? If unsure, re-read the letters.',
-      '',
-      'PATTERN B - "овгийн" WITHOUT "овогтой":',
-      '  "[CLAN] овгийн [SURNAME] [FIRSTNAME] [REGISTER]"',
-      '  The CLAN word before "овгийн" is NOT part of the name. IGNORE it completely.',
-      '  Take ONLY the TWO words immediately after "овгийн" as Surname+Firstname.',
-      '  Example: "Бургууд овгийн Дашдэлэг Байгалмаа ПО99072721"',
-      '  → CLAN="Бургууд" (ignore), name="Дашдэлэг Байгалмаа", register="ПО99072721"',
-      '  Example: "Дайдал овгийн Болдбаатар Солонго УЛ087061526"',
-      '  → CLAN="Дайдал" (ignore), name="Болдбаатар Солонго", register="УЛ087061526"',
-      '  CRITICAL: NEVER include the clan/tribe word (word before "овгийн") in the name field.',
-      '',
-      'FOR MULTIPLE OWNERS (when ownerCount >= 2):',
-      '  The certificate lists owners separated by comma or newline.',
-      '  FIRST owner → name + register',
-      '  SECOND owner → name2 + register2',
-      '  Example: "Дайдал овгийн Болдбаатар Солонго УЛ087061526, Шаравд овгийн Доржсүрэн Батзаяа ИЦ88022819 /хоёр иргэний өмч/"',
-      '  → name="Болдбаатар Солонго", register="УЛ087061526", name2="Доржсүрэн Батзаяа", register2="ИЦ88022819", ownerCount="2"',
-      '',
-      'register format: exactly 2 Cyrillic UPPERCASE letters + 8 digits. Examples: УБ56050863, УЛ08706152, ИЦ88022819',
-      '  Common register prefixes: УБ, УЛ, УО, ИЦ, АА, ББ, ОУ, БА, ДА — always 2 letters.',
-      'address: Full address with дүүрэг/хороо/байр/тоот.',
-      'area: Number + м.кв before "талбайтай". Example: "51 м.кв", "43 м.кв", "45.71 м.кв"',
-      'cert: Near "бүртгэж гэрчилгээ олгов". Starts with Ү-,Э-,Г-,Y-,V-. Example: V-2204001484, Y-2204099086',
-      '',
-      'purpose: Find the property purpose/type in the certificate.',
-      '  TYPE A (үл хөдлөх): Look for text before "зориулалттай".',
-      '  Examples: "Орон сууцны зориулалттай" → purpose="Орон сууцны зориулалттай"',
-      '            "Оффисын зориулалттай" → purpose="Оффисын зориулалттай"',
-      '  TYPE B (газар): Look for text before "зориулалтаар".',
-      '  Examples: "Гэр, орон сууцны хашааны газар зориулалтаар" → purpose="Гэр, орон сууцны хашааны газар"',
-      '  IMPORTANT: Do NOT confuse "хашааны газар" (land) with "орон сууцны" (apartment).',
-      '',
-      'Return ONLY the JSON object.'
+      'YOUR TASK: Transcribe the ENTIRE certificate text exactly as written, character by character.',
+      'Do not interpret, summarize or rearrange — just output the raw text.',
+      'Preserve all words, numbers, punctuation and slashes exactly.',
+      'Output plain text only, no JSON, no markdown.',
     ].join('\n');
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+
+    const ocrResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: 'claude-opus-4-5', max_tokens: 2048, messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: mimeType, data: base64Image } }, { type: 'text', text: prompt }] }] })
+      body: JSON.stringify({
+        model: 'claude-opus-4-5',
+        max_tokens: 2048,
+        messages: [{ role: 'user', content: [
+          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64Image } },
+          { type: 'text', text: ocrPrompt }
+        ]}]
+      })
     });
-    const aiData = await response.json();
+    const ocrData = await ocrResponse.json();
+    if (ocrData.error) throw new Error(ocrData.error.message);
+    const rawText = ocrData.content?.[0]?.text || '';
+
+    // ── АЛХАМ 2: Raw текстээс JSON задлах ──
+    const parsePrompt = [
+      'You are an expert parser for Mongolian property certificate text.',
+      'Below is the raw OCR text from a certificate. Extract the fields and return ONLY this JSON:',
+      '{"name":"","register":"","name2":"","register2":"","ownerCount":"","address":"","area":"","cert":"","purpose":""}',
+      '',
+      '--- RAW TEXT ---',
+      rawText,
+      '--- END TEXT ---',
+      '',
+      'EXTRACTION RULES:',
+      '',
+      'ownerCount: Find "/нэг иргэний өмч/" → "1", "/хоёр иргэний өмч/" → "2", "/гурав иргэний өмч/" → "3"',
+      '',
+      'OWNER NAME PATTERNS:',
+      'PATTERN A — contains "овогтой":',
+      '  "[CLAN] овгийн [SURNAME] овогтой [FIRSTNAME] [REGISTER]"',
+      '  → name = SURNAME + " " + FIRSTNAME',
+      '  Example: "Иижэн овгийн Дэмбэрэлсамбуу овогтой Алтанцэцэг ЦБ56050863"',
+      '  → name="Дэмбэрэлсамбуу Алтанцэцэг", register="ЦБ56050863"',
+      '',
+      'PATTERN B — "овгийн" WITHOUT "овогтой":',
+      '  "[CLAN] овгийн [SURNAME] [FIRSTNAME] [REGISTER]"',
+      '  → name = SURNAME + " " + FIRSTNAME  (IGNORE the CLAN word before овгийн)',
+      '  Example: "Хээр Данан овгийн Баяр Тэлмэн УТ06231710"',
+      '  → name="Баяр Тэлмэн", register="УТ06231710"',
+      '',
+      'MULTIPLE OWNERS: first owner → name+register, second owner → name2+register2',
+      '',
+      'register: exactly 2 Cyrillic uppercase letters + 8 digits. Example: ЦБ56050863, УТ06231710',
+      'address: full address including дүүрэг, хороо, байр, тоот',
+      'area: digits + м.кв before "талбайтай". Example: "43 м.кв"',
+      'cert: alphanumeric code near "гэрчилгээ олгов". Example: V-2204001484',
+      'purpose: text before "зориулалттай" or "зориулалтаар"',
+      '',
+      'Return ONLY the JSON object, no explanation.',
+    ].join('\n');
+
+    const parseResponse = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({
+        model: 'claude-opus-4-5',
+        max_tokens: 1024,
+        messages: [{ role: 'user', content: parsePrompt }]
+      })
+    });
+    const parseData = await parseResponse.json();
     fs.unlinkSync(req.file.path);
-    if (aiData.error) return res.status(500).json({ error: aiData.error.message });
-    const text = aiData.content?.[0]?.text || '{}';
+    if (parseData.error) throw new Error(parseData.error.message);
+    const text = parseData.content?.[0]?.text || '{}';
     const extracted = JSON.parse(text.replace(/```json|```/g, '').trim());
     res.json({ success: true, data: extracted });
   } catch (err) {
