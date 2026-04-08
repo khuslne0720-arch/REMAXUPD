@@ -177,6 +177,12 @@
     document.getElementById('typeBadge').textContent =
       `🏠 ${typeNames[type] || type} — ${subtypeNames[subtype] || subtype}`;
 
+    // Гэрээний дугаар автоматаар авах
+    fetch(`/next-contract-number?type=${type}&subtype=${subtype}`)
+      .then(r => r.json())
+      .then(d => { if (d.contractNumber && !formData.contractNumber) document.getElementById('contractNumber').value = d.contractNumber; })
+      .catch(() => {});
+
     // Талбарт утга оруулах
     const fields = ['name','register','address','area','cert','phone','email','price','agent','contractNumber','startDate','endDate'];
     fields.forEach(f => {
