@@ -686,10 +686,18 @@
     document.getElementById('subtypeCard').style.display = 'none';
     document.querySelectorAll('[id^="t_"], [id^="st_"]').forEach(el => el.classList.remove('selected'));
     document.getElementById('generateBtn').disabled = true;
-    ['name','register','address','area','cert','phone','email','price'].forEach(k => {
+    ['name','register','address','area','cert','phone','email','price','agent'].forEach(k => {
       const el = document.getElementById('f_' + k);
       if (el) { el.value = ''; el.classList.remove('ai-filled'); }
     });
+    // Хамтран эзэмшигч цэвэрлэх
+    const n2 = document.getElementById('f_name2');
+    const r2 = document.getElementById('f_register2');
+    if (n2) { n2.value = ''; n2.classList.remove('ai-filled'); }
+    if (r2) { r2.value = ''; r2.classList.remove('ai-filled'); }
+    document.getElementById('coownerBlock').style.display = 'none';
+    const aiTag = document.getElementById('aiTag');
+    if (aiTag) aiTag.textContent = '🤖 AI дүүргэсэн';
     showSection(1);
     ['s1','s2','s3','s4'].forEach((id, i) => {
       const el = document.getElementById(id);
