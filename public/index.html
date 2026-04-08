@@ -269,7 +269,6 @@
   <!-- Progress steps -->
   <div class="steps">
     <div class="step active" id="s1"><div class="num">1</div><div>Гэрчилгээ</div></div>
-    <div class="step" id="s1b"><div class="num">✓</div><div>Текст шалгах</div></div>
     <div class="step" id="s2"><div class="num">2</div><div>Мэдээлэл</div></div>
     <div class="step" id="s3"><div class="num">3</div><div>Гэрээний төрөл</div></div>
     <div class="step" id="s4"><div class="num">4</div><div>Татах</div></div>
@@ -298,35 +297,6 @@
         <span id="analyzeSpinner" class="spinner"></span>
         <span id="analyzeTxt">🔍 AI-аар шинжлэх</span>
       </button>
-    </div>
-  </div>
-
-  <!-- ── STEP 1b: Raw text review ── -->
-  <div class="section" id="sec1b">
-    <div class="card">
-      <h2>🔍 AI уншсан текст шалгах</h2>
-      <p style="font-size:13px;color:var(--muted);margin-bottom:14px;">
-        AI гэрчилгээнээс уншсан бүх текст доор харагдана. <strong>Засах шаардлагатай бол засаад</strong> үргэлжлүүлнэ үү.<br>
-        Онцгой анхаарах: регистрийн дугаар (ЦБ, УТ г.м), гэрчилгээний дугаар (Ү-, Э-, Г-)
-      </p>
-      <textarea id="rawTextArea" style="
-        width:100%; min-height:220px; border:1.5px solid var(--border);
-        border-radius:8px; padding:12px; font-size:13px; font-family:'Courier New',monospace;
-        line-height:1.7; resize:vertical; background:#fafbff;
-      " placeholder="AI уншсан текст энд гарч ирнэ..."></textarea>
-      <div style="display:flex; gap:10px; margin-top:14px;">
-        <button onclick="goBackToUpload()" style="
-          flex:0; padding:11px 20px; background:var(--border); color:var(--text);
-          border:none; border-radius:var(--radius); font-size:14px; cursor:pointer;">
-          ← Буцах
-        </button>
-        <button onclick="confirmRawText()" style="
-          flex:1; padding:13px; background:var(--primary); color:#fff;
-          border:none; border-radius:var(--radius); font-size:15px;
-          font-weight:600; cursor:pointer;">
-          Зөв байна — Үргэлжлүүлэх →
-        </button>
-      </div>
     </div>
   </div>
 
@@ -560,11 +530,10 @@
       if (!res.ok) throw new Error(json.error || 'Алдаа гарлаа');
 
       extractedData = json.data || {};
-      // Raw text шалгах дэлгэц рүү явах
-      document.getElementById('rawTextArea').value = json.rawText || '';
-      showSection('1b');
+      populateForm(extractedData);
+      showSection(2);
       markStep(1, 'done');
-      markStep('1b', 'active');
+      markStep(2, 'active');
     } catch (err) {
       showError(err.message);
     } finally {
@@ -770,7 +739,7 @@
     const aiTag = document.getElementById('aiTag');
     if (aiTag) aiTag.textContent = '🤖 AI дүүргэсэн';
     showSection(1);
-    ['s1','s1b','s2','s3','s4'].forEach((id, i) => {
+    ['s1','s2','s3','s4'].forEach((id, i) => {
       const el = document.getElementById(id);
       if (el) el.className = 'step' + (i === 0 ? ' active' : '');
     });
