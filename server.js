@@ -113,6 +113,69 @@ function writeContracts(data) {
 }
 const upload = multer({ dest: 'uploads/', limits: { fileSize: 20 * 1024 * 1024 } });
 
+// ── Google Vision OCR (GOOGLE_VISION_KEY байвал ашиглана) ──
+async function googleVisionOCR(base64Image) {
+  const response = await fetch(
+    `https://vision.googleapis.com/v1/images:annotate?key=${process.env.GOOGLE_VISION_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requests: [{
+          image: { content: base64Image },
+          features: [{ type: 'DOCUMENT_TEXT_DETECTION', maxResults: 1 }],
+          imageContext: { languageHints: ['mn', 'ru'] }  // Монгол + Кирилл
+        }]
+      })
+    }
+  );
+  const data = await response.json();
+  if (data.error) throw new Error('Google Vision: ' + data.error.message);
+  return data.responses?.[0]?.fullTextAnnotation?.text || '';
+}
+
+// ── Claude OCR (fallback) ──
+async function claudeOCR(base64Image, mimeType) {
+  const ocrPrompt = [
+    'You are a precise OCR engine for official Mongolian government property certificates.',
+    'These certificates use a special decorative calligraphic font. Read EVERY character with maximum care.',
+    'The image has been preprocessed: grayscale, contrast enhanced, sharpened, binarized (black text on white).',
+    '',
+    'CRITICAL font confusion pairs:',
+    '  Ц vs У — Ц has a small descender/tail at bottom-right. У does not.',
+    '  Т vs П — Т has ONE vertical stroke. П has TWO.',
+    '  Ү vs У — Ү has TWO dots above. У has none.',
+    '  я vs л — я curves right at top. л is straight diagonal.',
+    '  лм cluster — never skip л before м (Тэлмэн not Тэмэн).',
+    '  ц vs з, э vs о, н vs и, ү vs у, ө vs о',
+    '',
+    'TASK: Transcribe the ENTIRE certificate text verbatim, character by character.',
+    'Output plain text only — no JSON, no markdown, no commentary.',
+  ].join('\n');
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': process.env.ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01',
+      'anthropic-beta': 'interleaved-thinking-2025-05-14'
+    },
+    body: JSON.stringify({
+      model: 'claude-opus-4-5',
+      max_tokens: 8000,
+      thinking: { type: 'enabled', budget_tokens: 5000 },
+      messages: [{ role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64Image } },
+        { type: 'text', text: ocrPrompt }
+      ]}]
+    })
+  });
+  const data = await response.json();
+  if (data.error) throw new Error(data.error.message);
+  return (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('') || '';
+}
+
 function buildParsePrompt(rawText) {
   return [
     'You are an expert parser for Mongolian property certificate text.',
@@ -157,62 +220,30 @@ app.post('/analyze', analyzeLimiter, upload.single('image'), async (req, res) =>
     let imageBuffer = fs.readFileSync(req.file.path);
     let sharpImg = sharp(imageBuffer);
     const meta = await sharpImg.metadata();
-    if (meta.width > 3500 || meta.height > 3500) {
-      sharpImg = sharpImg.resize({ width: 3500, height: 3500, fit: 'inside', withoutEnlargement: true });
+
+    // Зургийг дагнасан OCR-д зориулж сайжруулах
+    // 1. Хэт том бол багасгах — гэхдээ resolution хадгалах
+    if (meta.width > 3000 || meta.height > 3000) {
+      sharpImg = sharpImg.resize({ width: 3000, height: 3000, fit: 'inside', withoutEnlargement: true });
     }
+    // 2. Grayscale → contrast нэмэх → sharpen → adaptive threshold (цагаан дэвсгэр, хар текст)
     imageBuffer = await sharpImg
       .grayscale()
-      .normalise()
-      .sharpen({ sigma: 1.5, m1: 0.5, m2: 3 })
-      .jpeg({ quality: 95 })
+      .normalise()                                      // contrast автомат тэнцвэржүүлэх
+      .sharpen({ sigma: 2, m1: 1, m2: 5 })             // текст ирмэгийг тодруулах
+      .threshold(180)                                   // adaptive binarization — текст хар, дэвсгэр цагаан
+      .png()                                            // PNG = lossless, OCR-д JPEG-ээс дээр
       .toBuffer();
     const base64Image = imageBuffer.toString('base64');
+    const mimeType = 'image/png';
 
-    // ── АЛХАМ 1: Зургаас бүх текстийг үсэг үсгээр уншуулах ──
-    const ocrPrompt = [
-      'You are a precise OCR engine for official Mongolian government property certificates.',
-      'These certificates use a special decorative calligraphic font. Read EVERY character with maximum care.',
-      '',
-      'CRITICAL font confusion pairs in this font — examine each character carefully:',
-      '  Ц vs У — Ц has a small descender/tail at bottom-right corner. У does not.',
-      '  Т vs П — Т has ONE vertical stroke down from center. П has TWO vertical strokes.',
-      '  я vs л — я has a curved top leaning right. л has a straight diagonal.',
-      '  лм cluster — do not skip л when it appears before м (e.g. Тэлмэн, not Тэмэн).',
-      '  ц vs з — ц has a tail at bottom-right. з does not.',
-      '  э vs о — э opens to the right. о is fully closed.',
-      '  н vs и — н has a connecting bar in the MIDDLE. и has it at the TOP.',
-      '  ү vs у — ү has TWO dots above. у has none.',
-      '  ө vs о — ө has TWO dots above. о has none.',
-      '',
-      'YOUR TASK: Transcribe the ENTIRE certificate text exactly as written, character by character.',
-      'Do not interpret, summarize or rearrange — just output the raw text.',
-      'Preserve all words, numbers, punctuation and slashes exactly.',
-      'Output plain text only, no JSON, no markdown.',
-    ].join('\n');
-
-    const ocrResponse = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'interleaved-thinking-2025-05-14'
-      },
-      body: JSON.stringify({
-        model: 'claude-opus-4-5',
-        max_tokens: 8000,
-        thinking: { type: 'enabled', budget_tokens: 5000 },
-        messages: [{ role: 'user', content: [
-          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64Image } },
-          { type: 'text', text: ocrPrompt }
-        ]}]
-      })
-    });
-    const ocrData = await ocrResponse.json();
-    if (ocrData.error) throw new Error(ocrData.error.message);
-    // thinking block болон text block хоёулаа ирдэг — зөвхөн text-ийг авна
-    const rawText = (ocrData.content || []).filter(b => b.type === 'text').map(b => b.text).join('') || '';
-
+    // ── Google Vision байвал ашиглах, үгүй бол Claude OCR ──
+    let rawText = '';
+    if (process.env.GOOGLE_VISION_KEY) {
+      rawText = await googleVisionOCR(base64Image);
+    } else {
+      rawText = await claudeOCR(base64Image, mimeType);
+    }
     // ── АЛХАМ 2: Raw текстээс JSON задлах ──
     const parsePrompt = buildParsePrompt(rawText);
 
