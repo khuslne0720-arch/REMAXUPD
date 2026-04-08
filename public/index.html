@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Үл Хөдлөх Хөрөнгийн Гэрээ</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --primary: #1a3c5e;
+      --accent:  #c8962a;
+      --bg:      #f4f6f9;
+      --card:    #ffffff;
+      --border:  #dde1e9;
+      --text:    #1e2533;
+      --muted:   #6b7585;
+      --radius:  10px;
+    }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--primary);
+      color: #fff;
+      padding: 18px 32px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.2);
+    }
+    header .logo { font-size: 26px; }
+    header h1 { font-size: 18px; font-weight: 600; line-height: 1.3; }
+    header p  { font-size: 12px; opacity: .7; margin-top: 2px; }
+
+    /* ── Layout ── */
+    main { max-width: 860px; margin: 0 auto; padding: 32px 16px 60px; }
+
+    /* ── Steps bar ── */
+    .steps {
+      display: flex;
+      gap: 0;
+      margin-bottom: 32px;
+      background: var(--card);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+    .step {
+      flex: 1;
+      padding: 14px 10px;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      border-right: 1px solid var(--border);
+      cursor: default;
+      transition: background .2s;
+    }
+    .step:last-child { border-right: none; }
+    .step .num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      background: var(--border);
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+    .step.active .num { background: var(--accent); color: #fff; }
+    .step.active { color: var(--primary); }
+    .step.done .num { background: #27ae60; color: #fff; }
+    .step.done { color: #27ae60; }
+
+    /* ── Card ── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px 30px;
+      margin-bottom: 20px;
+    }
+    .card h2 {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 18px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* ── Upload zone ── */
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 36px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+    }
+    .upload-zone:hover, .upload-zone.drag { border-color: var(--accent); background: #fdf8ee; }
+    .upload-zone .icon { font-size: 40px; margin-bottom: 10px; }
+    .upload-zone p { color: var(--muted); font-size: 14px; }
+    .upload-zone strong { color: var(--accent); }
+    #fileInput { display: none; }
+
+    /* ── Image preview ── */
+    #previewWrap {
+      margin-top: 16px;
+      display: none;
+      border-radius: var(--radius);
+      overflow: hidden;
+      border: 1px solid var(--border);
+      position: relative;
+    }
+    #previewWrap img { width: 100%; max-height: 280px; object-fit: contain; display: block; background: #f0f0f0; }
+    #changeImg {
+      position: absolute; top: 8px; right: 8px;
+      background: rgba(0,0,0,.55); color: #fff;
+      border: none; border-radius: 6px;
+      padding: 5px 10px; font-size: 12px; cursor: pointer;
+    }
+
+    /* ── Analyze button ── */
+    #analyzeBtn {
+      margin-top: 16px;
+      width: 100%;
+      padding: 13px;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background .2s;
+    }
+    #analyzeBtn:hover { background: #0f2744; }
+    #analyzeBtn:disabled { opacity: .6; cursor: not-allowed; }
+
+    /* ── Loading spinner ── */
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      display: none;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Form grid ── */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 540px) { .form-grid { grid-template-columns: 1fr; } }
+
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group label { font-size: 13px; font-weight: 600; color: var(--primary); }
+    .form-group input {
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 9px 12px;
+      font-size: 14px;
+      transition: border-color .15s;
+    }
+    .form-group input:focus { outline: none; border-color: var(--accent); }
+    .form-group input.ai-filled { background: #f0fdf4; border-color: #86efac; }
+    .form-group .ai-badge {
+      font-size: 10px; color: #16a34a;
+      background: #dcfce7; border-radius: 4px;
+      padding: 1px 5px; margin-left: 4px;
+    }
+
+    /* ── Contract type selector ── */
+    .type-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 480px) { .type-grid { grid-template-columns: 1fr; } }
+
+    .type-card {
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      cursor: pointer;
+      transition: border-color .15s, background .15s;
+      text-align: center;
+    }
+    .type-card:hover { border-color: var(--accent); background: #fdf8ee; }
+    .type-card.selected { border-color: var(--primary); background: #eef3fa; }
+    .type-card .type-icon { font-size: 28px; margin-bottom: 6px; }
+    .type-card .type-name { font-weight: 700; font-size: 15px; color: var(--primary); }
+    .type-card .type-sub { font-size: 12px; color: var(--muted); margin-top: 3px; }
+    .type-card .type-en { font-size: 11px; color: var(--muted); margin-top: 2px; font-style: italic; }
+
+    /* ── Generate button ── */
+    #generateBtn {
+      width: 100%;
+      padding: 15px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: background .2s;
+      margin-top: 8px;
+    }
+    #generateBtn:hover { background: #b07d1e; }
+    #generateBtn:disabled { opacity: .55; cursor: not-allowed; }
+
+    /* ── Alert ── */
+    .alert {
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      font-size: 13px;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .alert.error   { background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b; }
+    .alert.success { background: #f0fdf4; border: 1px solid #86efac; color: #166534; }
+
+    /* ── Section hidden/visible ── */
+    .section { display: none; }
+    .section.visible { display: block; }
+
+    /* ── Summary tag ── */
+    .summary-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--primary);
+      color: #fff;
+      font-size: 12px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      margin-left: auto;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🏠</div>
+  <div>
+    <h1>Үл Хөдлөх Хөрөнгийн Гэрээ Үүсгэгч</h1>
+    <p>AI-д суурилсан зуучлалын гэрээний систем</p>
+  </div>
+</header>
+
+<main>
+
+  <!-- Progress steps -->
+  <div class="steps">
+    <div class="step active" id="s1"><div class="num">1</div><div>Гэрчилгээ</div></div>
+    <div class="step" id="s2"><div class="num">2</div><div>Мэдээлэл</div></div>
+    <div class="step" id="s3"><div class="num">3</div><div>Гэрээний төрөл</div></div>
+    <div class="step" id="s4"><div class="num">4</div><div>Татах</div></div>
+  </div>
+
+  <div class="alert error" id="alertBox"></div>
+  <div class="alert success" id="successBox"></div>
+
+  <!-- ── STEP 1: Upload ── -->
+  <div class="section visible" id="sec1">
+    <div class="card">
+      <h2>📄 Үл хөдлөх хөрөнгийн гэрчилгээ оруулах</h2>
+      <div class="upload-zone" id="dropZone">
+        <div class="icon">📁</div>
+        <p><strong>Зураг сонгох</strong> эсвэл энд чирж тавих</p>
+        <p style="margin-top:6px; font-size:12px;">JPG, PNG, HEIC · Дээд тал нь 10 МБ</p>
+      </div>
+      <input type="file" id="fileInput" accept="image/*" />
+
+      <div id="previewWrap">
+        <img id="previewImg" src="" alt="preview" />
+        <button id="changeImg" onclick="resetUpload()">✕ Солих</button>
+      </div>
+
+      <button id="analyzeBtn" onclick="analyzeImage()">
+        <span id="analyzeSpinner" class="spinner"></span>
+        <span id="analyzeTxt">🔍 AI-аар шинжлэх</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ── STEP 2: Edit data ── -->
+  <div class="section" id="sec2">
+    <div class="card">
+      <h2>✏️ Мэдээлэл шалгаж засах
+        <span class="summary-tag" id="aiTag">🤖 AI дүүргэсэн</span>
+      </h2>
+
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Овог нэр <span class="ai-badge" id="badge_name"></span></label>
+          <input type="text" id="f_name" placeholder="Жишээ: Болд Батбаяр" />
+        </div>
+        <div class="form-group">
+          <label>Регистрийн дугаар <span class="ai-badge" id="badge_register"></span></label>
+          <input type="text" id="f_register" placeholder="УБ12345678" />
+        </div>
+
+        <!-- Өмчлөгчийн тоо + Хамтран эзэмшигч -->
+        <div id="ownerCountBadge" style="display:none; grid-column:1/-1; background:#eff6ff; border:1.5px solid #93c5fd; border-radius:8px; padding:10px 14px; font-size:13px; font-weight:600; color:#1a3c5e;">
+          👥 <span id="ownerCountText"></span>
+        </div>
+        <div id="coowner-group" style="display:none; grid-column:1/-1; background:#eff6ff; border:1.5px solid #93c5fd; border-radius:8px; padding:14px;">
+          <div style="font-size:13px; font-weight:700; color:#1a3c5e; margin-bottom:10px;">👤 Хамтран эзэмшигч</div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div class="form-group">
+              <label>Овог нэр <span class="ai-badge" id="badge_name2"></span></label>
+              <input type="text" id="f_name2" placeholder="Овог Нэр" />
+            </div>
+            <div class="form-group">
+              <label>Регистрийн дугаар <span class="ai-badge" id="badge_register2"></span></label>
+              <input type="text" id="f_register2" placeholder="АА00000000" />
+            </div>
+          </div>
+        </div>
+        <div class="form-group" style="grid-column: 1/-1;">
+          <label>Хаяг <span class="ai-badge" id="badge_address"></span></label>
+          <input type="text" id="f_address" placeholder="Улаанбаатар, Сүхбаатар дүүрэг, ..." />
+        </div>
+        <div class="form-group">
+          <label>Талбайн хэмжээ (м²) <span class="ai-badge" id="badge_area"></span></label>
+          <input type="text" id="f_area" placeholder="65.4" />
+        </div>
+        <div class="form-group">
+          <label>Гэрчилгээний дугаар <span class="ai-badge" id="badge_cert"></span></label>
+          <input type="text" id="f_cert" placeholder="УБ-123456" />
+        </div>
+        <div class="form-group" style="grid-column: 1/-1;">
+          <label>Хөрөнгийн зориулалт <span class="ai-badge" id="badge_purpose"></span></label>
+          <input type="text" id="f_purpose" placeholder="Орон сууцны зориулалттай" />
+        </div>
+        <div class="form-group">
+          <label>Утасны дугаар</label>
+          <input type="text" id="f_phone" placeholder="9900-0000" />
+        </div>
+        <div class="form-group">
+          <label>И-мэйл</label>
+          <input type="email" id="f_email" placeholder="example@mail.mn" />
+        </div>
+        <div class="form-group" style="grid-column: 1/-1;">
+          <label>Үнэ (төгрөгөөр)</label>
+          <input type="text" id="f_price" placeholder="150,000,000" oninput="formatPrice(this)" />
+        </div>
+        <div class="form-group" style="grid-column: 1/-1;">
+          <label>Агентын нэр</label>
+          <input type="text" id="f_agent" placeholder="Агентын овог нэр" />
+        </div>
+        <div class="form-group" style="grid-column: 1/-1;">
+          <label>Гэрээний дугаар</label>
+          <input type="text" id="f_contractNumber" placeholder="Гэрээний төрөл сонгоход автоматаар үүснэ..." readonly
+            style="background:#f0fdf4; border-color:#86efac; font-weight:700; color:#166534; font-size:15px;" />
+        </div>
+      </div>
+
+      <button class="btn-next" onclick="goToStep3()" style="
+        margin-top:22px; width:100%; padding:13px;
+        background:var(--primary); color:#fff; border:none;
+        border-radius:var(--radius); font-size:15px; font-weight:600;
+        cursor:pointer;">
+        Үргэлжлүүлэх →
+      </button>
+    </div>
+  </div>
+
+  <!-- ── STEP 3: Contract type ── -->
+  <div class="section" id="sec3">
+    <div class="card">
+      <h2>📋 Гэрээний төрөл сонгох — Алхам 1</h2>
+      <div class="type-grid">
+        <div class="type-card" id="t_sell" onclick="selectType('sell')">
+          <div class="type-icon">🏷️</div>
+          <div class="type-name">Худалдах</div>
+          <div class="type-en">Sell</div>
+          <div class="type-sub">Үл хөдлөх хөрөнгө худалдах</div>
+        </div>
+        <div class="type-card" id="t_rent" onclick="selectType('rent')">
+          <div class="type-icon">🔑</div>
+          <div class="type-name">Түрээслэх</div>
+          <div class="type-en">Rent</div>
+          <div class="type-sub">Үл хөдлөх хөрөнгө түрээслэх</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="subtypeCard" style="display:none;">
+      <h2>📋 Гэрээний нөхцөл — Алхам 2</h2>
+      <div class="type-grid">
+        <div class="type-card" id="st_standard" onclick="selectSubtype('standard')">
+          <div class="type-icon">📄</div>
+          <div class="type-name">Энгийн</div>
+          <div class="type-en">Standard</div>
+
+        </div>
+        <div class="type-card" id="st_exclusive" onclick="selectSubtype('exclusive')">
+          <div class="type-icon">⭐</div>
+          <div class="type-name">Онцгой</div>
+          <div class="type-en">Exclusive</div>
+
+        </div>
+      </div>
+    </div>
+
+    <button id="generateBtn" onclick="generateContract()" disabled>
+      <span id="genSpinner" class="spinner"></span>
+      <span id="genTxt">👁️ Preview харах & Гэрээ үүсгэх</span>
+    </button>
+  </div>
+
+  <!-- ── STEP 4: Done ── -->
+  <div class="section" id="sec4">
+    <div class="card" style="text-align:center; padding: 40px;">
+      <div style="font-size:60px; margin-bottom:16px;">✅</div>
+      <h2 style="justify-content:center; border:none; font-size:20px;">Гэрээ амжилттай үүслээ!</h2>
+      <p style="color:var(--muted); margin-top:10px; margin-bottom:24px;">
+        Таны .docx файл татаж эхэллээ. Файлыг Microsoft Word-ээр нээж засварлана уу.
+      </p>
+      <button onclick="resetAll()" style="
+        padding:12px 28px; background:var(--primary); color:#fff;
+        border:none; border-radius:var(--radius); font-size:15px;
+        font-weight:600; cursor:pointer;">
+        🔄 Шинэ гэрээ үүсгэх
+      </button>
+    </div>
+  </div>
+
+</main>
+
+<script>
+  let selectedFile = null;
+  let extractedData = {};
+  let contractType = null;
+  let contractSubtype = null;
+
+  function formatPrice(el) {
+    const raw = el.value.replace(/[^0-9]/g, '');
+    el.value = raw ? Number(raw).toLocaleString('en-US') : '';
+  }
+
+  // ── Upload & drag ──
+  const dropZone = document.getElementById('dropZone');
+  const fileInput = document.getElementById('fileInput');
+
+  dropZone.addEventListener('click', () => fileInput.click());
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag');
+    const f = e.dataTransfer.files[0];
+    if (f && f.type.startsWith('image/')) setFile(f);
+  });
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) setFile(fileInput.files[0]);
+  });
+
+  function setFile(f) {
+    selectedFile = f;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      document.getElementById('previewImg').src = ev.target.result;
+      document.getElementById('previewWrap').style.display = 'block';
+      document.getElementById('analyzeBtn').style.display = 'flex';
+      dropZone.style.display = 'none';
+    };
+    reader.readAsDataURL(f);
+  }
+
+  function resetUpload() {
+    selectedFile = null;
+    fileInput.value = '';
+    document.getElementById('previewWrap').style.display = 'none';
+    document.getElementById('analyzeBtn').style.display = 'none';
+    document.getElementById('previewImg').src = '';
+    dropZone.style.display = 'block';
+  }
+
+  // ── Analyze ──
+  async function analyzeImage() {
+    if (!selectedFile) return;
+    setAnalyzing(true);
+
+    const form = new FormData();
+    form.append('image', selectedFile);
+
+    try {
+      const res = await fetch('/analyze', { method: 'POST', body: form });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Алдаа гарлаа');
+
+      extractedData = json.data || {};
+      populateForm(extractedData);
+      showSection(2);
+      markStep(1, 'done');
+      markStep(2, 'active');
+    } catch (err) {
+      showError(err.message);
+    } finally {
+      setAnalyzing(false);
+    }
+  }
+
+  function setAnalyzing(on) {
+    const btn = document.getElementById('analyzeBtn');
+    btn.disabled = on;
+    document.getElementById('analyzeSpinner').style.display = on ? 'block' : 'none';
+    document.getElementById('analyzeTxt').textContent = on ? 'Шинжилж байна...' : '🔍 AI-аар шинжлэх';
+  }
+
+  function populateForm(data) {
+    const fields = ['name', 'register', 'address', 'area', 'cert', 'purpose'];
+    fields.forEach(k => {
+      const el = document.getElementById('f_' + k);
+      const badge = document.getElementById('badge_' + k);
+      if (data[k]) {
+        el.value = data[k];
+        el.classList.add('ai-filled');
+        badge.textContent = 'AI';
+      } else {
+        el.value = '';
+        el.classList.remove('ai-filled');
+        badge.textContent = '';
+      }
+    });
+
+    // Өмчлөгчийн тоо
+    const countMap = {'1':'нэг иргэний өмч','2':'хоёр иргэний өмч','3':'гурван иргэний өмч','4':'дөрвөн иргэний өмч'};
+    if (data.ownerCount) {
+      document.getElementById('ownerCountBadge').style.display = 'block';
+      document.getElementById('ownerCountText').textContent = countMap[data.ownerCount] || data.ownerCount + ' иргэний өмч';
+    } else {
+      document.getElementById('ownerCountBadge').style.display = 'none';
+    }
+
+    // Хамтран эзэмшигч
+    if (data.name2 || data.register2) {
+      document.getElementById('coowner-group').style.display = 'block';
+      if (data.name2) { document.getElementById('f_name2').value = data.name2; document.getElementById('f_name2').classList.add('ai-filled'); document.getElementById('badge_name2').textContent = 'AI'; }
+      if (data.register2) { document.getElementById('f_register2').value = data.register2; document.getElementById('f_register2').classList.add('ai-filled'); document.getElementById('badge_register2').textContent = 'AI'; }
+    } else {
+      document.getElementById('coowner-group').style.display = 'none';
+      document.getElementById('f_name2').value = '';
+      document.getElementById('f_register2').value = '';
+    }
+  }
+
+  function goToStep3() {
+    showSection(3);
+    markStep(2, 'done');
+    markStep(3, 'active');
+  }
+
+  // ── Contract type selection ──
+  function selectType(type) {
+    contractType = type;
+    contractSubtype = null;
+    document.querySelectorAll('[id^="t_"]').forEach(el => el.classList.remove('selected'));
+    document.getElementById('t_' + type).classList.add('selected');
+    document.getElementById('subtypeCard').style.display = 'block';
+    document.querySelectorAll('[id^="st_"]').forEach(el => el.classList.remove('selected'));
+    document.getElementById('generateBtn').disabled = true;
+    updateSubtypeLabels(type);
+  }
+
+  function updateSubtypeLabels(type) {
+    const std = document.querySelector('#st_standard .type-sub');
+    const exc = document.querySelector('#st_exclusive .type-sub');
+    if (type === 'sell') {
+      std.textContent = '';
+      exc.textContent = '';
+    } else {
+      std.textContent = '';
+      exc.textContent = '';
+    }
+  }
+
+  async function selectSubtype(subtype) {
+    contractSubtype = subtype;
+    document.querySelectorAll('[id^="st_"]').forEach(el => el.classList.remove('selected'));
+    document.getElementById('st_' + subtype).classList.add('selected');
+    document.getElementById('generateBtn').disabled = false;
+
+    try {
+      const r = await fetch(`/next-contract-number?type=${contractType}&subtype=${subtype}`);
+      const data = await r.json();
+      document.getElementById('f_contractNumber').value = data.contractNumber;
+    } catch(e) {
+      document.getElementById('f_contractNumber').value = '';
+    }
+  }
+
+  // ── Generate — preview хуудас руу шилжих ──
+  function generateContract() {
+    const data = {
+      name:           document.getElementById('f_name').value.trim(),
+      register:       document.getElementById('f_register').value.trim(),
+      name2:          document.getElementById('f_name2')?.value.trim() || '',
+      register2:      document.getElementById('f_register2')?.value.trim() || '',
+      address:        document.getElementById('f_address').value.trim(),
+      area:           document.getElementById('f_area').value.trim(),
+      cert:           document.getElementById('f_cert').value.trim(),
+      purpose:        document.getElementById('f_purpose')?.value.trim() || '',
+      phone:          document.getElementById('f_phone').value.trim(),
+      email:          document.getElementById('f_email').value.trim(),
+      price:          document.getElementById('f_price').value.trim(),
+      agent:          document.getElementById('f_agent').value.trim(),
+      contractNumber: document.getElementById('f_contractNumber').value.trim(),
+    };
+
+    const encoded = encodeURIComponent(JSON.stringify(data));
+    window.location.href = `/preview.html?type=${contractType}&subtype=${contractSubtype}&data=${encoded}`;
+  }
+
+  function setGenerating(on) {
+    const btn = document.getElementById('generateBtn');
+    btn.disabled = on;
+    document.getElementById('genSpinner').style.display = on ? 'block' : 'none';
+    document.getElementById('genTxt').textContent = on ? 'Үүсгэж байна...' : '📥 Гэрээ үүсгэх (.docx татах)';
+  }
+
+  function resetAll() {
+    contractType = contractSubtype = null;
+    extractedData = {};
+    resetUpload();
+    document.getElementById('alertBox').style.display = 'none';
+    document.getElementById('successBox').style.display = 'none';
+    document.getElementById('subtypeCard').style.display = 'none';
+    document.querySelectorAll('[id^="t_"], [id^="st_"]').forEach(el => el.classList.remove('selected'));
+    document.getElementById('generateBtn').disabled = true;
+    ['name','register','address','area','cert','phone','email','price','contractNumber'].forEach(k => {
+      const el = document.getElementById('f_' + k);
+      if (el) { el.value = ''; el.classList.remove('ai-filled'); }
+    });
+    showSection(1);
+    ['s1','s2','s3','s4'].forEach((id, i) => {
+      const el = document.getElementById(id);
+      el.className = 'step' + (i === 0 ? ' active' : '');
+    });
+  }
+
+  // ── Helpers ──
+  function showSection(n) {
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('visible'));
+    document.getElementById('sec' + n).classList.add('visible');
+  }
+  function markStep(n, cls) {
+    const el = document.getElementById('s' + n);
+    el.className = 'step ' + cls;
+  }
+  function showError(msg) {
+    const el = document.getElementById('alertBox');
+    el.textContent = '⚠️ ' + msg;
+    el.style.display = 'block';
+    setTimeout(() => el.style.display = 'none', 6000);
+  }
+</script>
+</body>
+</html>

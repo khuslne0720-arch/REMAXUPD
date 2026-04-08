@@ -1,0 +1,27 @@
+{
+  "name": "realestate-app",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "compression": "^1.8.1",
+    "cors": "^2.8.6",
+    "docx": "^9.6.1",
+    "docxtemplater": "^3.68.3",
+    "dotenv": "^17.4.0",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.3.2",
+    "helmet": "^8.1.0",
+    "multer": "^2.1.1",
+    "openai": "^6.33.0",
+    "pizzip": "^3.2.0",
+    "xlsx": "^0.18.5"
+  }
+}

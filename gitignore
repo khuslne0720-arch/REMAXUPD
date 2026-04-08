@@ -1,0 +1,14 @@
+# Нууц мэдээлэл
+.env
+contracts.json
+
+# Uploads
+uploads/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db

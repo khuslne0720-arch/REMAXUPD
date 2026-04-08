@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Гэрээ preview</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; min-height: 100vh; }
+  .container { max-width: 900px; margin: 0 auto; padding: 24px; }
+  h2 { color: #1a3c5e; margin-bottom: 6px; font-size: 22px; }
+  .subtitle { color: #666; font-size: 13px; margin-bottom: 24px; }
+
+  .card { background: white; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); padding: 28px; margin-bottom: 20px; }
+  .card-title { font-size: 15px; font-weight: 700; color: #1a3c5e; margin-bottom: 18px; padding-bottom: 10px; border-bottom: 2px solid #e8f0fe; }
+
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-group.full { grid-column: 1 / -1; }
+  label { font-size: 12px; font-weight: 600; color: #555; text-transform: uppercase; letter-spacing: 0.4px; }
+  input, textarea { border: 1.5px solid #dde3ee; border-radius: 8px; padding: 10px 12px; font-size: 14px; font-family: inherit; transition: border-color 0.2s; background: #fafbff; }
+  input:focus, textarea:focus { outline: none; border-color: #1a3c5e; background: white; }
+  textarea { resize: vertical; min-height: 70px; }
+
+  .preview-box { background: #f8f9ff; border: 1.5px solid #dde3ee; border-radius: 8px; padding: 20px; font-family: 'Times New Roman', serif; font-size: 13px; line-height: 1.8; white-space: pre-wrap; max-height: 500px; overflow-y: auto; color: #222; }
+  .highlight { background: #fff3cd; border-radius: 3px; padding: 1px 3px; }
+
+  .btn-row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .btn { padding: 12px 24px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; font-family: inherit; }
+  .btn-primary { background: #1a3c5e; color: white; }
+  .btn-primary:hover { background: #2a5298; transform: translateY(-1px); }
+  .btn-secondary { background: #e8f0fe; color: #1a3c5e; }
+  .btn-secondary:hover { background: #d0e0fc; }
+  .btn-success { background: #28a745; color: white; }
+  .btn-success:hover { background: #218838; transform: translateY(-1px); }
+
+  .type-badge { display: inline-block; background: #e8f0fe; color: #1a3c5e; border-radius: 20px; padding: 4px 14px; font-size: 12px; font-weight: 600; margin-bottom: 16px; }
+
+  .status { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-top: 12px; display: none; }
+  .status.success { background: #d4edda; color: #155724; display: block; }
+  .status.error { background: #f8d7da; color: #721c24; display: block; }
+
+  .loading { display: none; align-items: center; gap: 8px; color: #666; font-size: 13px; }
+  .loading.show { display: flex; }
+  .spinner { width: 16px; height: 16px; border: 2px solid #ddd; border-top-color: #1a3c5e; border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="container">
+  <h2>📄 Гэрээ Preview & Засах</h2>
+  <p class="subtitle">Мэдээллийг засаад доор preview харж, гэрээгээ татаж авна уу</p>
+
+  <div id="typeInfo" class="card" style="display:none">
+    <div class="card-title">Гэрээний мэдээлэл</div>
+    <span id="typeBadge" class="type-badge"></span>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Гэрээний дугаар</label>
+        <input type="text" id="contractNumber" placeholder="№ОТ26/001">
+      </div>
+      <div class="form-group">
+        <label>Агент</label>
+        <input type="text" id="agent" placeholder="Агентын нэр">
+      </div>
+      <div class="form-group">
+        <label>Эхлэх огноо</label>
+        <input type="date" id="startDate">
+      </div>
+      <div class="form-group">
+        <label>Гэрээний хугацаа (сар)</label>
+        <select id="durationMonths" style="border: 1.5px solid #dde3ee; border-radius: 8px; padding: 10px 12px; font-size: 14px; font-family: inherit; background: #fafbff; cursor: pointer;">
+          <option value="">-- Сар сонгох --</option>
+          <option value="1">1 сар</option>
+          <option value="2">2 сар</option>
+          <option value="3">3 сар</option>
+          <option value="4">4 сар</option>
+          <option value="5">5 сар</option>
+          <option value="6">6 сар</option>
+          <option value="7">7 сар</option>
+          <option value="8">8 сар</option>
+          <option value="9">9 сар</option>
+          <option value="10">10 сар</option>
+          <option value="11">11 сар</option>
+          <option value="12">12 сар</option>
+        </select>
+        <input type="hidden" id="endDate">
+        <span id="endDateDisplay" style="font-size: 12px; color: #1a3c5e; margin-top: 4px;"></span>
+      </div>
+    </div>
+  </div>
+
+  <div id="ownerCard" class="card" style="display:none">
+    <div class="card-title">ҮХХ эзэмшигчийн мэдээлэл</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Эзэмшигчийн нэр</label>
+        <input type="text" id="name" placeholder="Овог Нэр">
+      </div>
+      <div class="form-group">
+        <label>Регистрийн дугаар</label>
+        <input type="text" id="register" placeholder="АА00000000">
+      </div>
+      <div class="form-group">
+        <label>Утас</label>
+        <input type="text" id="phone" placeholder="99000000">
+      </div>
+      <div class="form-group">
+        <label>И-мэйл</label>
+        <input type="text" id="email" placeholder="example@mail.com">
+      </div>
+      <div class="form-group full">
+        <label>Хаяг</label>
+        <textarea id="address" placeholder="Дүүрэг, хороо, байр, тоот"></textarea>
+      </div>
+      <div class="form-group full">
+        <label>Эзэмшигчийн оршин суух хаяг</label>
+        <textarea id="residentialAddress" placeholder="Эзэмшигч оршин суух хаяг (гэрчилгээний хаягаас өөр бол)"></textarea>
+      </div>
+    </div>
+
+    <!-- Хамтран эзэмшигч -->
+    <div id="coownerSection" style="display:none; margin-top:16px; padding:14px; background:#eff6ff; border:1.5px solid #93c5fd; border-radius:8px;">
+      <div style="font-size:13px; font-weight:700; color:#1a3c5e; margin-bottom:10px;">👥 Хамтран эзэмшигч</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Эзэмшигчийн нэр</label>
+          <input type="text" id="name2" placeholder="Овог Нэр">
+        </div>
+        <div class="form-group">
+          <label>Регистрийн дугаар</label>
+          <input type="text" id="register2" placeholder="АА00000000">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="propertyCard" class="card" style="display:none">
+    <div class="card-title">Үл хөдлөх хөрөнгийн мэдээлэл</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Гэрчилгээний дугаар</label>
+        <input type="text" id="cert" placeholder="V-0000000">
+      </div>
+      <div class="form-group">
+        <label>Талбайн хэмжээ</label>
+        <input type="text" id="area" placeholder="51.5 м²">
+      </div>
+      <div class="form-group full">
+        <label>Хөрөнгийн зориулалт <span style="font-size:11px;color:#888;font-weight:400;">(AI автоматаар авна)</span></label>
+        <input type="text" id="purpose" placeholder="Орон сууцны зориулалттай">
+      </div>
+      <div class="form-group">
+        <label>Үнэ (төгрөг)</label>
+        <input type="text" id="price" placeholder="100,000,000" oninput="calcCommission()">
+      </div>
+
+      <!-- Шимтгэл -->
+      <div class="form-group" id="sellCommissionGroup" style="display:none">
+        <label>Шимтгэлийн хувь</label>
+        <select id="sellRate" onchange="calcCommission()" style="border:1.5px solid #dde3ee;border-radius:8px;padding:10px 12px;font-size:14px;font-family:inherit;background:#fafbff;cursor:pointer;">
+          <option value="">-- Сонгох --</option>
+          <option value="3.3">3.3%</option>
+          <option value="5.5">5.5%</option>
+        </select>
+      </div>
+
+      <div class="form-group" id="rentCommissionGroup" style="display:none">
+        <label>Түрээсийн хугацаа</label>
+        <select id="rentRate" onchange="calcCommission()" style="border:1.5px solid #dde3ee;border-radius:8px;padding:10px 12px;font-size:14px;font-family:inherit;background:#fafbff;cursor:pointer;">
+          <option value="">-- Сонгох --</option>
+          <option value="22">1–31 хоног (22%)</option>
+          <option value="55">32–180 хоног (55%)</option>
+          <option value="99">181+ хоног (99%)</option>
+        </select>
+      </div>
+
+      <div class="form-group" id="commissionResultGroup" style="display:none">
+        <label>Шимтгэлийн дүн (төгрөг)</label>
+        <input type="text" id="commissionAmount" readonly style="background:#f0fdf4;border-color:#86efac;font-weight:700;color:#166534;font-size:15px;">
+      </div>
+    </div>
+  </div>
+
+
+  <div id="actionCard" class="card" style="display:none">
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="updatePreview()">🔄 Preview шинэчлэх</button>
+      <button class="btn btn-success" onclick="downloadDocx()" id="downloadBtn">⬇️ DOCX татах</button>
+    </div>
+    <div id="statusMsg" class="status"></div>
+    <div class="loading" id="loading"><div class="spinner"></div> Гэрээ үүсгэж байна...</div>
+  </div>
+</div>
+
+<script>
+  // URL параметрээс өгөгдөл авах
+  const params = new URLSearchParams(window.location.search);
+  const type = params.get('type');
+  const subtype = params.get('subtype');
+  const dataParam = params.get('data');
+
+  let formData = {};
+
+  if (dataParam) {
+    try { formData = JSON.parse(decodeURIComponent(dataParam)); } catch(e) {}
+  }
+
+  if (type && subtype) {
+    // Карт харуулах
+    document.getElementById('typeInfo').style.display = 'block';
+    document.getElementById('ownerCard').style.display = 'block';
+    document.getElementById('propertyCard').style.display = 'block';
+    document.getElementById('actionCard').style.display = 'block';
+
+    // Шимтгэлийн сонголт харуулах
+    if (type === 'sell') {
+      document.getElementById('sellCommissionGroup').style.display = 'flex';
+    } else if (type === 'rent') {
+      document.getElementById('rentCommissionGroup').style.display = 'flex';
+    }
+
+    // Badge тохируулах
+    const typeNames = { sell: 'Худалдах', rent: 'Түрээслэх' };
+    const subtypeNames = { standard: 'Энгийн', exclusive: 'Онцгой' };
+    document.getElementById('typeBadge').textContent =
+      `🏠 ${typeNames[type] || type} — ${subtypeNames[subtype] || subtype}`;
+
+    // Талбарт утга оруулах
+    const fields = ['name','register','address','residentialAddress','area','cert','purpose','phone','email','price','agent','contractNumber','startDate'];
+    fields.forEach(f => {
+      const el = document.getElementById(f);
+      if (el && formData[f]) el.value = formData[f];
+    });
+
+    // Хамтран эзэмшигч
+    if (formData.name2 || formData.register2) {
+      document.getElementById('coownerSection').style.display = 'block';
+      if (formData.name2) document.getElementById('name2').value = formData.name2;
+      if (formData.register2) document.getElementById('register2').value = formData.register2;
+    }
+    document.getElementById('name2').addEventListener('input', () => { document.getElementById('coownerSection').style.display='block'; updatePreview(); });
+    document.getElementById('register2').addEventListener('input', updatePreview);
+
+    // duration байвал сонгох
+    if (formData.duration) {
+      const sel = document.getElementById('durationMonths');
+      if (sel) sel.value = formData.duration;
+    }
+
+    // Өөрчлөлт хийхэд preview шинэчлэх
+    fields.forEach(f => {
+      const el = document.getElementById(f);
+      if (el) el.addEventListener('input', updatePreview);
+    });
+
+    document.getElementById('startDate').addEventListener('change', () => { calcEndDate(); updatePreview(); });
+    document.getElementById('durationMonths').addEventListener('change', () => { calcEndDate(); updatePreview(); });
+
+    calcEndDate();
+    updatePreview();
+  }
+
+  function calcEndDate() {
+    const startVal = document.getElementById('startDate').value;
+    const months   = parseInt(document.getElementById('durationMonths').value);
+    if (!startVal || !months) return;
+
+    const [y, m, d] = startVal.split('-').map(Number);
+    const end = new Date(y, m - 1 + months, d);
+
+    const ey = end.getFullYear();
+    const em = String(end.getMonth() + 1).padStart(2, '0');
+    const ed = String(end.getDate()).padStart(2, '0');
+    const endStr = `${ey}-${em}-${ed}`;
+
+    document.getElementById('endDate').value = endStr;
+    document.getElementById('endDateDisplay').textContent =
+      `📅 Дуусах: ${ey} оны ${parseInt(em)}-р сарын ${parseInt(ed)}-ний өдөр`;
+  }
+
+  function getFormData() {
+    return {
+      name:               document.getElementById('name').value,
+      register:           document.getElementById('register').value,
+      name2:              document.getElementById('name2')?.value || '',
+      register2:          document.getElementById('register2')?.value || '',
+      address:            document.getElementById('address').value,
+      residentialAddress: document.getElementById('residentialAddress')?.value || '',
+      area:               document.getElementById('area').value,
+      cert:               document.getElementById('cert').value,
+      purpose:            document.getElementById('purpose')?.value || '',
+      phone:              document.getElementById('phone').value,
+      email:              document.getElementById('email').value,
+      price:              document.getElementById('price').value,
+      agent:              document.getElementById('agent').value,
+      contractNumber:     document.getElementById('contractNumber').value,
+      startDate:          document.getElementById('startDate').value,
+      endDate:            document.getElementById('endDate').value,
+      duration:           document.getElementById('durationMonths').value,
+      commissionRate:     (document.getElementById('sellRate')?.value || document.getElementById('rentRate')?.value || ''),
+      commissionAmount:   document.getElementById('commissionAmount')?.value || '',
+    };
+  }
+
+  function calcCommission() {
+    const priceRaw = document.getElementById('price').value.replace(/[^0-9]/g, '');
+    const price = parseFloat(priceRaw) || 0;
+    const sellRate = document.getElementById('sellRate')?.value;
+    const rentRate = document.getElementById('rentRate')?.value;
+    const rate = parseFloat(sellRate || rentRate) || 0;
+    const resultGroup = document.getElementById('commissionResultGroup');
+
+    if (price > 0 && rate > 0) {
+      const commission = Math.round(price * rate / 100);
+      document.getElementById('commissionAmount').value = commission.toLocaleString('en-US') + ' ₮';
+      resultGroup.style.display = 'flex';
+      updatePreview();
+    } else {
+      resultGroup.style.display = 'none';
+    }
+  }
+
+  async function updatePreview() {
+    const data = getFormData();
+    try {
+      const res = await fetch('/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, subtype, data })
+      });
+      const result = await res.json();
+    } catch(e) {
+    }
+  }
+
+  async function downloadDocx() {
+    const data = getFormData();
+    const btn = document.getElementById('downloadBtn');
+    const loading = document.getElementById('loading');
+    const status = document.getElementById('statusMsg');
+
+    btn.disabled = true;
+    loading.classList.add('show');
+    status.className = 'status';
+
+    try {
+      const res = await fetch('/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, subtype, data })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Алдаа гарлаа');
+      }
+
+      const blob = await res.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `contract_${type}_${subtype}.docx`;
+      a.click();
+
+      status.className = 'status success';
+      status.textContent = '✅ Гэрээ амжилттай татагдлаа!';
+    } catch(e) {
+      status.className = 'status error';
+      status.textContent = '❌ ' + e.message;
+    } finally {
+      btn.disabled = false;
+      loading.classList.remove('show');
+    }
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>REMAX PEAK — Admin</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{--bg:#0a0c10;--surface:#111318;--surface2:#181c24;--border:#1f2530;--accent:#c8962a;--accent2:#e8b84b;--text:#e8eaf0;--muted:#6b7585;--danger:#e05555;--success:#3ecf8e;--navy:#1a3c5e}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+  #loginScreen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:radial-gradient(ellipse at 30% 50%,#1a2a3a 0%,#0a0c10 60%)}
+  .login-card{width:360px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:40px;box-shadow:0 24px 80px rgba(0,0,0,.6)}
+  .login-logo{display:flex;align-items:center;gap:10px;margin-bottom:32px}
+  .login-logo .dot{width:36px;height:36px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px}
+  .login-logo h1{font-size:18px;font-weight:700}
+  .login-logo p{font-size:11px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase}
+  .login-label{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;display:block}
+  .login-input{width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:12px 16px;color:var(--text);font-family:'DM Mono',monospace;font-size:14px;margin-bottom:20px;transition:border-color .2s}
+  .login-input:focus{outline:none;border-color:var(--accent)}
+  .login-btn{width:100%;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;border:none;border-radius:10px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;transition:opacity .2s,transform .1s}
+  .login-btn:hover{opacity:.9;transform:translateY(-1px)}
+  .login-error{color:var(--danger);font-size:13px;margin-top:12px;display:none}
+  #dashboard{display:none}
+  .sidebar{position:fixed;left:0;top:0;bottom:0;width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:24px 0;z-index:100}
+  .sidebar-logo{padding:0 20px 24px;border-bottom:1px solid var(--border);margin-bottom:20px}
+  .sidebar-logo h2{font-size:15px;font-weight:700}
+  .sidebar-logo p{font-size:11px;color:var(--muted);margin-top:2px}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:10px 20px;font-size:13px;font-weight:500;color:var(--muted);cursor:pointer;border-radius:8px;margin:2px 10px;transition:all .15s}
+  .nav-item:hover{background:var(--surface2);color:var(--text)}
+  .nav-item.active{background:rgba(200,150,42,.12);color:var(--accent2)}
+  .nav-item .icon{font-size:16px;width:20px;text-align:center}
+  .sidebar-bottom{margin-top:auto;padding:16px 10px 0;border-top:1px solid var(--border)}
+  .main{margin-left:220px;padding:28px 32px;min-height:100vh}
+  .page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px}
+  .page-title{font-size:22px;font-weight:700;letter-spacing:-.4px}
+  .page-sub{font-size:13px;color:var(--muted);margin-top:3px}
+  .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px}
+  .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;position:relative;overflow:hidden}
+  .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),transparent)}
+  .stat-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px}
+  .stat-value{font-size:28px;font-weight:700;letter-spacing:-1px;font-family:'DM Mono',monospace}
+  .stat-icon{position:absolute;right:16px;top:16px;font-size:24px;opacity:.3}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+  .card-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+  .card-title{font-size:14px;font-weight:600}
+  .search-box{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:7px 12px;color:var(--text);font-size:13px;font-family:'DM Sans',sans-serif;width:220px}
+  .search-box:focus{outline:none;border-color:var(--accent)}
+  table{width:100%;border-collapse:collapse}
+  th{padding:10px 16px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);background:var(--surface2)}
+  td{padding:12px 16px;font-size:13px;border-bottom:1px solid rgba(31,37,48,.6);vertical-align:middle}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:rgba(255,255,255,.02)}
+  .badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600}
+  .badge-sell{background:rgba(200,150,42,.15);color:var(--accent2)}
+  .badge-rent{background:rgba(62,207,142,.12);color:var(--success)}
+  .badge-exclusive{background:rgba(26,60,94,.4);color:#7ab4e8}
+  .badge-standard{background:rgba(107,117,133,.15);color:var(--muted)}
+  .btn-danger{background:rgba(224,85,85,.1);color:var(--danger);border:1px solid rgba(224,85,85,.2);border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s}
+  .btn-danger:hover{background:rgba(224,85,85,.2)}
+  .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:opacity .2s}
+  .btn-primary:hover{opacity:.85}
+  .agent-grid{padding:20px;display:flex;flex-direction:column;gap:12px}
+  .agent-row{display:flex;align-items:center;gap:14px;padding:14px;background:var(--surface2);border-radius:10px;border:1px solid var(--border)}
+  .agent-avatar{width:38px;height:38px;background:linear-gradient(135deg,var(--navy),#2a5298);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;flex-shrink:0}
+  .agent-name{font-size:14px;font-weight:600}
+  .agent-count{font-size:12px;color:var(--muted);margin-top:2px}
+  .agent-bar-wrap{flex:1;background:var(--bg);border-radius:4px;height:6px}
+  .agent-bar{height:6px;border-radius:4px;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .6s ease}
+  .agent-num{font-size:16px;font-weight:700;font-family:'DM Mono',monospace;color:var(--accent2);flex-shrink:0;min-width:24px;text-align:right}
+  .page{display:none}
+  .page.active{display:block}
+  .empty-state{padding:48px;text-align:center;color:var(--muted);font-size:14px}
+  .empty-state .big{font-size:36px;margin-bottom:12px}
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;z-index:999}
+  .modal-overlay.show{display:flex}
+  .modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px;width:340px;text-align:center}
+  .modal h3{font-size:16px;margin-bottom:8px}
+  .modal p{font-size:13px;color:var(--muted);margin-bottom:24px}
+  .modal-btns{display:flex;gap:10px}
+  .btn-cancel{flex:1;padding:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px}
+  .btn-confirm-del{flex:1;padding:10px;background:var(--danger);border:none;border-radius:8px;color:#fff;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600}
+  .toast{position:fixed;bottom:24px;right:24px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 18px;font-size:13px;box-shadow:0 8px 32px rgba(0,0,0,.4);transform:translateY(80px);opacity:0;transition:all .3s ease;z-index:9999}
+  .toast.show{transform:translateY(0);opacity:1}
+  .toast.success{border-color:var(--success);color:var(--success)}
+  .toast.error{border-color:var(--danger);color:var(--danger)}
+</style>
+</head>
+<body>
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="dot">🏠</div>
+      <div><h1>REMAX PEAK</h1><p>Admin Panel</p></div>
+    </div>
+    <label class="login-label">Admin түлхүүр</label>
+    <input type="password" class="login-input" id="keyInput" placeholder="••••••••••••">
+    <button class="login-btn" onclick="login()">Нэвтрэх →</button>
+    <div class="login-error" id="loginError">❌ Түлхүүр буруу байна</div>
+  </div>
+</div>
+
+<div id="dashboard">
+  <div class="sidebar">
+    <div class="sidebar-logo"><h2>🏠 REMAX PEAK</h2><p>Admin Dashboard</p></div>
+    <div class="nav-item active" onclick="showPage('overview')" id="nav-overview"><span class="icon">📊</span>Ерөнхий</div>
+    <div class="nav-item" onclick="showPage('contracts')" id="nav-contracts"><span class="icon">📄</span>Гэрээнүүд</div>
+    <div class="nav-item" onclick="showPage('agents')" id="nav-agents"><span class="icon">👥</span>Агентууд</div>
+    <div class="sidebar-bottom">
+      <div class="nav-item" onclick="exportExcel()"><span class="icon">⬇️</span>Excel татах</div>
+      <div class="nav-item" onclick="logout()" style="color:#e05555"><span class="icon">🚪</span>Гарах</div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="page active" id="page-overview">
+      <div class="page-header">
+        <div><div class="page-title">Ерөнхий мэдээлэл</div><div class="page-sub" id="lastUpdated">Ачаалж байна...</div></div>
+        <button class="btn-primary" onclick="loadData()">🔄 Шинэчлэх</button>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-label">Нийт гэрээ</div><div class="stat-value" id="statTotal">—</div><div class="stat-icon">📄</div></div>
+        <div class="stat-card"><div class="stat-label">Худалдах</div><div class="stat-value" id="statSell">—</div><div class="stat-icon">🏷️</div></div>
+        <div class="stat-card"><div class="stat-label">Түрээслэх</div><div class="stat-value" id="statRent">—</div><div class="stat-icon">🔑</div></div>
+        <div class="stat-card"><div class="stat-label">Агент</div><div class="stat-value" id="statAgents">—</div><div class="stat-icon">👥</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">Сүүлийн 5 гэрээ</div></div>
+        <table><thead><tr><th>Гэрээний №</th><th>Эзэмшигч</th><th>Агент</th><th>Төрөл</th><th>Огноо</th></tr></thead>
+        <tbody id="recentTable"><tr><td colspan="5" class="empty-state">Ачаалж байна...</td></tr></tbody></table>
+      </div>
+    </div>
+
+    <div class="page" id="page-contracts">
+      <div class="page-header">
+        <div><div class="page-title">Гэрээнүүд</div><div class="page-sub">Бүх гэрээний жагсаалт</div></div>
+        <input class="search-box" placeholder="🔍 Хайх..." id="searchBox" oninput="filterContracts()">
+      </div>
+      <div class="card">
+        <table><thead><tr><th>Гэрээний №</th><th>Эзэмшигч</th><th>РД</th><th>Агент</th><th>Төрөл</th><th>Байршил</th><th>Огноо</th><th></th></tr></thead>
+        <tbody id="contractsTable"><tr><td colspan="8" class="empty-state">Ачаалж байна...</td></tr></tbody></table>
+      </div>
+    </div>
+
+    <div class="page" id="page-agents">
+      <div class="page-header"><div><div class="page-title">Агентийн статистик</div><div class="page-sub">Хэн хэдэн гэрээ хийсэн бэ</div></div></div>
+      <div class="card"><div class="agent-grid" id="agentGrid"><div class="empty-state"><div class="big">👥</div>Ачаалж байна...</div></div></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal">
+    <div style="font-size:36px;margin-bottom:12px">🗑️</div>
+    <h3>Гэрээ устгах</h3>
+    <p>Энэ гэрээг устгахад итгэлтэй байна уу?</p>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal()">Болих</button>
+      <button class="btn-confirm-del" onclick="confirmDelete()">Устгах</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+let adminToken='',allContracts=[],deleteTarget=null;
+
+// Session-аас token уншиж автоматаар нэвтрэх
+const savedToken = sessionStorage.getItem('adminToken');
+if (savedToken) {
+  adminToken = savedToken;
+  fetch('/admin/contracts', {headers:{'x-admin-token': adminToken}})
+    .then(r => {
+      if (r.ok) {
+        document.getElementById('loginScreen').style.display='none';
+        document.getElementById('dashboard').style.display='block';
+        r.json().then(data=>{allContracts=data;renderAll()});
+      } else {
+        sessionStorage.removeItem('adminToken');
+        adminToken='';
+      }
+    }).catch(()=>{sessionStorage.removeItem('adminToken');adminToken='';});
+}
+
+document.getElementById('keyInput').addEventListener('keydown',e=>{if(e.key==='Enter')login()});
+
+async function login(){
+  const key=document.getElementById('keyInput').value;
+  if(!key)return;
+  const errEl=document.getElementById('loginError');
+  errEl.style.display='none';
+
+  try {
+    const r = await fetch('/admin/login', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({key})
+    });
+    const data = await r.json();
+    if(r.ok && data.token){
+      adminToken = data.token;
+      sessionStorage.setItem('adminToken', adminToken);
+      document.getElementById('loginScreen').style.display='none';
+      document.getElementById('dashboard').style.display='block';
+      await loadData();
+    } else {
+      errEl.textContent = '❌ ' + (data.error || 'Түлхүүр буруу байна');
+      errEl.style.display='block';
+    }
+  } catch(e) {
+    errEl.textContent = '❌ Сервертэй холбогдоход алдаа';
+    errEl.style.display='block';
+  }
+}
+
+async function logout(){
+  await fetch('/admin/logout',{method:'POST',headers:{'x-admin-token':adminToken}}).catch(()=>{});
+  adminToken='';
+  allContracts=[];
+  sessionStorage.removeItem('adminToken');
+  document.getElementById('loginScreen').style.display='flex';
+  document.getElementById('dashboard').style.display='none';
+  document.getElementById('keyInput').value='';
+}
+
+function showPage(name){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  document.getElementById('nav-'+name).classList.add('active');
+}
+
+async function loadData(){
+  try{
+    const r=await fetch('/admin/contracts',{headers:{'x-admin-token':adminToken}});
+    if(!r.ok){showToast('Мэдээлэл татахад алдаа','error');return}
+    allContracts=await r.json();
+    renderAll();
+  }catch(e){showToast('Сервертэй холбогдоход алдаа','error')}
+}
+
+function renderAll(){
+  renderStats();renderRecent();renderContracts();renderAgents();
+  document.getElementById('lastUpdated').textContent='Сүүлд шинэчлэгдсэн: '+new Date().toLocaleTimeString('mn-MN');
+}
+
+function renderStats(){
+  const sell=allContracts.filter(c=>c.listingType&&c.listingType.includes('sell')).length;
+  const rent=allContracts.filter(c=>c.listingType&&c.listingType.includes('rent')).length;
+  const agents=new Set(allContracts.map(c=>c.agent).filter(Boolean)).size;
+  document.getElementById('statTotal').textContent=allContracts.length;
+  document.getElementById('statSell').textContent=sell;
+  document.getElementById('statRent').textContent=rent;
+  document.getElementById('statAgents').textContent=agents;
+}
+
+function renderRecent(){
+  const recent=[...allContracts].reverse().slice(0,5);
+  const tb=document.getElementById('recentTable');
+  if(!recent.length){tb.innerHTML='<tr><td colspan="5" class="empty-state"><div class="big">📭</div>Гэрээ байхгүй</td></tr>';return}
+  tb.innerHTML=recent.map(c=>`<tr><td><span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--accent2)">${c.contractNumber||'—'}</span></td><td>${c.owner||'—'}</td><td>${c.agent||'—'}</td><td>${typeBadge(c.listingType)}</td><td style="color:var(--muted);font-size:12px">${formatDate(c.createdAt)}</td></tr>`).join('');
+}
+
+function renderContracts(data){
+  const list=data||allContracts;
+  const tb=document.getElementById('contractsTable');
+  if(!list.length){tb.innerHTML='<tr><td colspan="8" class="empty-state"><div class="big">📭</div>Гэрээ байхгүй</td></tr>';return}
+  tb.innerHTML=list.map(c=>`<tr><td><span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--accent2)">${c.contractNumber||'—'}</span></td><td style="font-weight:500">${c.owner||'—'}</td><td style="font-size:12px;color:var(--muted);font-family:'DM Mono',monospace">${c.register||'—'}</td><td>${c.agent||'—'}</td><td>${typeBadge(c.listingType)}</td><td style="font-size:12px;color:var(--muted);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.address||'—'}</td><td style="color:var(--muted);font-size:12px">${formatDate(c.createdAt)}</td><td><button class="btn-danger" onclick="deleteContract('${c.id}')">Устгах</button></td></tr>`).join('');
+}
+
+function renderAgents(){
+  const map={};
+  allContracts.forEach(c=>{const a=c.agent||'Тодорхойгүй';map[a]=(map[a]||0)+1});
+  const sorted=Object.entries(map).sort((a,b)=>b[1]-a[1]);
+  const max=sorted[0]?.[1]||1;
+  const grid=document.getElementById('agentGrid');
+  if(!sorted.length){grid.innerHTML='<div class="empty-state"><div class="big">👥</div>Агент байхгүй</div>';return}
+  grid.innerHTML=sorted.map(([name,count])=>`<div class="agent-row"><div class="agent-avatar">${name[0]||'?'}</div><div style="flex:1"><div class="agent-name">${name}</div><div class="agent-count">${count} гэрээ</div><div class="agent-bar-wrap" style="margin-top:8px"><div class="agent-bar" style="width:${Math.round(count/max*100)}%"></div></div></div><div class="agent-num">${count}</div></div>`).join('');
+}
+
+function filterContracts(){
+  const q=document.getElementById('searchBox').value.toLowerCase();
+  if(!q){renderContracts();return}
+  renderContracts(allContracts.filter(c=>[(c.contractNumber||''),(c.owner||''),(c.agent||''),(c.register||''),(c.address||'')].some(v=>v.toLowerCase().includes(q))));
+}
+
+function deleteContract(id){deleteTarget=id;document.getElementById('deleteModal').classList.add('show')}
+function closeModal(){deleteTarget=null;document.getElementById('deleteModal').classList.remove('show')}
+
+async function confirmDelete(){
+  if(!deleteTarget)return;
+  try{
+    const r=await fetch('/admin/contracts/'+deleteTarget,{method:'DELETE',headers:{'x-admin-token':adminToken}});
+    if(r.ok){showToast('✅ Гэрээ устгагдлаа','success');closeModal();loadData()}
+    else showToast('❌ Устгахад алдаа','error');
+  }catch(e){showToast('❌ Алдаа гарлаа','error')}
+}
+
+async function exportExcel(){
+  try{
+    const r=await fetch('/admin/export-excel',{headers:{'x-admin-token':adminToken}});
+    if(!r.ok){const e=await r.json();showToast('❌ '+e.error,'error');return}
+    const blob=await r.blob();
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='contracts.xlsx';a.click();
+    showToast('✅ Excel татагдлаа','success');
+  }catch(e){showToast('❌ Алдаа гарлаа','error')}
+}
+
+function typeBadge(t){
+  if(!t)return '<span class="badge badge-standard">—</span>';
+  const sell=t.includes('sell'),exc=t.includes('exclusive');
+  return `<span class="badge ${sell?'badge-sell':'badge-rent'}">${sell?'🏷️ Худалдах':'🔑 Түрээс'}</span> <span class="badge ${exc?'badge-exclusive':'badge-standard'}">${exc?'Онцгой':'Энгийн'}</span>`;
+}
+
+function formatDate(s){if(!s)return'—';const d=new Date(s);return isNaN(d)?'—':d.toLocaleDateString('mn-MN')}
+
+function showToast(msg,type){
+  const t=document.getElementById('toast');t.textContent=msg;t.className='toast '+(type||'');
+  t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);
+}
+</script>
+</body>
+</html>
