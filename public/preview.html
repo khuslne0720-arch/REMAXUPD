@@ -231,6 +231,11 @@
     document.getElementById('typeBadge').textContent =
       `🏠 ${typeNames[type] || type} — ${subtypeNames[subtype] || subtype}`;
 
+    fetch(`/next-contract-number?type=${type}&subtype=${subtype}`)
+      .then(r => r.json())
+      .then(d => { if (d.contractNumber && !formData.contractNumber) document.getElementById('contractNumber').value = d.contractNumber; })
+      .catch(() => {});
+
     // Талбарт утга оруулах
     const fields = ['name','register','address','residentialAddress','area','cert','purpose','phone','email','price','agent','contractNumber','startDate'];
     fields.forEach(f => {
