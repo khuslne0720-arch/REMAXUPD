@@ -316,24 +316,6 @@
           <label>Регистрийн дугаар <span class="ai-badge" id="badge_register"></span></label>
           <input type="text" id="f_register" placeholder="УБ12345678" />
         </div>
-
-        <!-- Өмчлөгчийн тоо + Хамтран эзэмшигч -->
-        <div id="ownerCountBadge" style="display:none; grid-column:1/-1; background:#eff6ff; border:1.5px solid #93c5fd; border-radius:8px; padding:10px 14px; font-size:13px; font-weight:600; color:#1a3c5e;">
-          👥 <span id="ownerCountText"></span>
-        </div>
-        <div id="coowner-group" style="display:none; grid-column:1/-1; background:#eff6ff; border:1.5px solid #93c5fd; border-radius:8px; padding:14px;">
-          <div style="font-size:13px; font-weight:700; color:#1a3c5e; margin-bottom:10px;">👤 Хамтран эзэмшигч</div>
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-            <div class="form-group">
-              <label>Овог нэр <span class="ai-badge" id="badge_name2"></span></label>
-              <input type="text" id="f_name2" placeholder="Овог Нэр" />
-            </div>
-            <div class="form-group">
-              <label>Регистрийн дугаар <span class="ai-badge" id="badge_register2"></span></label>
-              <input type="text" id="f_register2" placeholder="АА00000000" />
-            </div>
-          </div>
-        </div>
         <div class="form-group" style="grid-column: 1/-1;">
           <label>Хаяг <span class="ai-badge" id="badge_address"></span></label>
           <input type="text" id="f_address" placeholder="Улаанбаатар, Сүхбаатар дүүрэг, ..." />
@@ -346,10 +328,6 @@
           <label>Гэрчилгээний дугаар <span class="ai-badge" id="badge_cert"></span></label>
           <input type="text" id="f_cert" placeholder="УБ-123456" />
         </div>
-        <div class="form-group" style="grid-column: 1/-1;">
-          <label>Хөрөнгийн зориулалт <span class="ai-badge" id="badge_purpose"></span></label>
-          <input type="text" id="f_purpose" placeholder="Орон сууцны зориулалттай" />
-        </div>
         <div class="form-group">
           <label>Утасны дугаар</label>
           <input type="text" id="f_phone" placeholder="9900-0000" />
@@ -360,16 +338,11 @@
         </div>
         <div class="form-group" style="grid-column: 1/-1;">
           <label>Үнэ (төгрөгөөр)</label>
-          <input type="text" id="f_price" placeholder="150,000,000" oninput="formatPrice(this)" />
+          <input type="text" id="f_price" placeholder="150,000,000" />
         </div>
         <div class="form-group" style="grid-column: 1/-1;">
           <label>Агентын нэр</label>
           <input type="text" id="f_agent" placeholder="Агентын овог нэр" />
-        </div>
-        <div class="form-group" style="grid-column: 1/-1;">
-          <label>Гэрээний дугаар</label>
-          <input type="text" id="f_contractNumber" placeholder="Гэрээний төрөл сонгоход автоматаар үүснэ..." readonly
-            style="background:#f0fdf4; border-color:#86efac; font-weight:700; color:#166534; font-size:15px;" />
         </div>
       </div>
 
@@ -410,20 +383,20 @@
           <div class="type-icon">📄</div>
           <div class="type-name">Энгийн</div>
           <div class="type-en">Standard</div>
-
+          <div class="type-sub">Үндсэн үйлчилгээ · 2% хураамж</div>
         </div>
         <div class="type-card" id="st_exclusive" onclick="selectSubtype('exclusive')">
           <div class="type-icon">⭐</div>
           <div class="type-name">Онцгой</div>
           <div class="type-en">Exclusive</div>
-
+          <div class="type-sub">Бүрэн үйлчилгээ · 3% хураамж</div>
         </div>
       </div>
     </div>
 
     <button id="generateBtn" onclick="generateContract()" disabled>
       <span id="genSpinner" class="spinner"></span>
-      <span id="genTxt">👁️ Preview харах & Гэрээ үүсгэх</span>
+      <span id="genTxt">📥 Гэрээ үүсгэх (.docx татах)</span>
     </button>
   </div>
 
@@ -451,11 +424,6 @@
   let extractedData = {};
   let contractType = null;
   let contractSubtype = null;
-
-  function formatPrice(el) {
-    const raw = el.value.replace(/[^0-9]/g, '');
-    el.value = raw ? Number(raw).toLocaleString('en-US') : '';
-  }
 
   // ── Upload & drag ──
   const dropZone = document.getElementById('dropZone');
@@ -528,7 +496,7 @@
   }
 
   function populateForm(data) {
-    const fields = ['name', 'register', 'address', 'area', 'cert', 'purpose'];
+    const fields = ['name', 'register', 'address', 'area', 'cert'];
     fields.forEach(k => {
       const el = document.getElementById('f_' + k);
       const badge = document.getElementById('badge_' + k);
@@ -542,26 +510,6 @@
         badge.textContent = '';
       }
     });
-
-    // Өмчлөгчийн тоо
-    const countMap = {'1':'нэг иргэний өмч','2':'хоёр иргэний өмч','3':'гурван иргэний өмч','4':'дөрвөн иргэний өмч'};
-    if (data.ownerCount) {
-      document.getElementById('ownerCountBadge').style.display = 'block';
-      document.getElementById('ownerCountText').textContent = countMap[data.ownerCount] || data.ownerCount + ' иргэний өмч';
-    } else {
-      document.getElementById('ownerCountBadge').style.display = 'none';
-    }
-
-    // Хамтран эзэмшигч
-    if (data.name2 || data.register2) {
-      document.getElementById('coowner-group').style.display = 'block';
-      if (data.name2) { document.getElementById('f_name2').value = data.name2; document.getElementById('f_name2').classList.add('ai-filled'); document.getElementById('badge_name2').textContent = 'AI'; }
-      if (data.register2) { document.getElementById('f_register2').value = data.register2; document.getElementById('f_register2').classList.add('ai-filled'); document.getElementById('badge_register2').textContent = 'AI'; }
-    } else {
-      document.getElementById('coowner-group').style.display = 'none';
-      document.getElementById('f_name2').value = '';
-      document.getElementById('f_register2').value = '';
-    }
   }
 
   function goToStep3() {
@@ -586,49 +534,64 @@
     const std = document.querySelector('#st_standard .type-sub');
     const exc = document.querySelector('#st_exclusive .type-sub');
     if (type === 'sell') {
-      std.textContent = '';
-      exc.textContent = '';
+      std.textContent = 'Үндсэн үйлчилгээ · 2% хураамж';
+      exc.textContent = 'Бүрэн үйлчилгээ · 3% хураамж';
     } else {
-      std.textContent = '';
-      exc.textContent = '';
+      std.textContent = '1 сарын түрээстэй тэнцэх хураамж';
+      exc.textContent = '1.2 сарын түрээстэй тэнцэх хураамж';
     }
   }
 
-  async function selectSubtype(subtype) {
+  function selectSubtype(subtype) {
     contractSubtype = subtype;
     document.querySelectorAll('[id^="st_"]').forEach(el => el.classList.remove('selected'));
     document.getElementById('st_' + subtype).classList.add('selected');
     document.getElementById('generateBtn').disabled = false;
-
-    try {
-      const r = await fetch(`/next-contract-number?type=${contractType}&subtype=${subtype}`);
-      const data = await r.json();
-      document.getElementById('f_contractNumber').value = data.contractNumber;
-    } catch(e) {
-      document.getElementById('f_contractNumber').value = '';
-    }
   }
 
-  // ── Generate — preview хуудас руу шилжих ──
-  function generateContract() {
+  // ── Generate ──
+  async function generateContract() {
     const data = {
-      name:           document.getElementById('f_name').value.trim(),
-      register:       document.getElementById('f_register').value.trim(),
-      name2:          document.getElementById('f_name2')?.value.trim() || '',
-      register2:      document.getElementById('f_register2')?.value.trim() || '',
-      address:        document.getElementById('f_address').value.trim(),
-      area:           document.getElementById('f_area').value.trim(),
-      cert:           document.getElementById('f_cert').value.trim(),
-      purpose:        document.getElementById('f_purpose')?.value.trim() || '',
-      phone:          document.getElementById('f_phone').value.trim(),
-      email:          document.getElementById('f_email').value.trim(),
-      price:          document.getElementById('f_price').value.trim(),
-      agent:          document.getElementById('f_agent').value.trim(),
-      contractNumber: document.getElementById('f_contractNumber').value.trim(),
+      name:     document.getElementById('f_name').value.trim(),
+      register: document.getElementById('f_register').value.trim(),
+      address:  document.getElementById('f_address').value.trim(),
+      area:     document.getElementById('f_area').value.trim(),
+      cert:     document.getElementById('f_cert').value.trim(),
+      phone:    document.getElementById('f_phone').value.trim(),
+      email:    document.getElementById('f_email').value.trim(),
+      price:    document.getElementById('f_price').value.trim(),
+      agent:    document.getElementById('f_agent').value.trim(),
     };
 
-    const encoded = encodeURIComponent(JSON.stringify(data));
-    window.location.href = `/preview.html?type=${contractType}&subtype=${contractSubtype}&data=${encoded}`;
+    setGenerating(true);
+    try {
+      const res = await fetch('/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: contractType, subtype: contractSubtype, data })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Үүсгэхэд алдаа гарлаа');
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `contract_${contractType}_${contractSubtype}_${Date.now()}.docx`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      showSection(4);
+      markStep(3, 'done');
+      markStep(4, 'active');
+    } catch (err) {
+      showError(err.message);
+    } finally {
+      setGenerating(false);
+    }
   }
 
   function setGenerating(on) {
@@ -647,7 +610,7 @@
     document.getElementById('subtypeCard').style.display = 'none';
     document.querySelectorAll('[id^="t_"], [id^="st_"]').forEach(el => el.classList.remove('selected'));
     document.getElementById('generateBtn').disabled = true;
-    ['name','register','address','area','cert','phone','email','price','contractNumber'].forEach(k => {
+    ['name','register','address','area','cert','phone','email','price'].forEach(k => {
       const el = document.getElementById('f_' + k);
       if (el) { el.value = ''; el.classList.remove('ai-filled'); }
     });
