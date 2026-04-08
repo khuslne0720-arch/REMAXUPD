@@ -112,6 +112,45 @@ function writeContracts(data) {
   fs.writeFileSync(CONTRACTS_FILE, JSON.stringify(data, null, 2), 'utf-8');
 }
 const upload = multer({ dest: 'uploads/', limits: { fileSize: 20 * 1024 * 1024 } });
+
+function buildParsePrompt(rawText) {
+  return [
+    'You are an expert parser for Mongolian property certificate text.',
+    'Below is the raw OCR text from a certificate. Extract the fields and return ONLY this JSON:',
+    '{"name":"","register":"","name2":"","register2":"","ownerCount":"","address":"","area":"","cert":"","purpose":""}',
+    '',
+    '--- RAW TEXT ---',
+    rawText,
+    '--- END TEXT ---',
+    '',
+    'EXTRACTION RULES:',
+    '',
+    'ownerCount: Find "/нэг иргэний өмч/" → "1", "/хоёр иргэний өмч/" → "2", "/гурав иргэний өмч/" → "3"',
+    '',
+    'OWNER NAME PATTERNS:',
+    'PATTERN A — contains "овогтой":',
+    '  "[CLAN] овгийн [SURNAME] овогтой [FIRSTNAME] [REGISTER]"',
+    '  → name = SURNAME + " " + FIRSTNAME',
+    '  Example: "Иижэн овгийн Дэмбэрэлсамбуу овогтой Алтанцэцэг ЦБ56050863"',
+    '  → name="Дэмбэрэлсамбуу Алтанцэцэг", register="ЦБ56050863"',
+    '',
+    'PATTERN B — "овгийн" WITHOUT "овогтой":',
+    '  "[CLAN] овгийн [SURNAME] [FIRSTNAME] [REGISTER]"',
+    '  → name = SURNAME + " " + FIRSTNAME  (IGNORE the CLAN word before овгийн)',
+    '  Example: "Хээр Данан овгийн Баяр Тэлмэн УТ06231710"',
+    '  → name="Баяр Тэлмэн", register="УТ06231710"',
+    '',
+    'MULTIPLE OWNERS: first owner → name+register, second owner → name2+register2',
+    '',
+    'register: exactly 2 Cyrillic uppercase letters + 8 digits. Example: ЦБ56050863, УТ06231710',
+    'address: full address including дүүрэг, хороо, байр, тоот',
+    'area: digits + м.кв before "талбайтай". Example: "43 м.кв"',
+    'cert: alphanumeric code near "гэрчилгээ олгов". Starts with Ү-, Э-, Г-, Y-, V-. Example: Ү-2204001484, V-2204155889',
+    'purpose: text before "зориулалттай" or "зориулалтаар"',
+    '',
+    'Return ONLY the JSON object, no explanation.',
+  ].join('\n');
+}
 app.post('/analyze', analyzeLimiter, upload.single('image'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No image uploaded' });
   try {
@@ -175,42 +214,7 @@ app.post('/analyze', analyzeLimiter, upload.single('image'), async (req, res) =>
     const rawText = (ocrData.content || []).filter(b => b.type === 'text').map(b => b.text).join('') || '';
 
     // ── АЛХАМ 2: Raw текстээс JSON задлах ──
-    const parsePrompt = [
-      'You are an expert parser for Mongolian property certificate text.',
-      'Below is the raw OCR text from a certificate. Extract the fields and return ONLY this JSON:',
-      '{"name":"","register":"","name2":"","register2":"","ownerCount":"","address":"","area":"","cert":"","purpose":""}',
-      '',
-      '--- RAW TEXT ---',
-      rawText,
-      '--- END TEXT ---',
-      '',
-      'EXTRACTION RULES:',
-      '',
-      'ownerCount: Find "/нэг иргэний өмч/" → "1", "/хоёр иргэний өмч/" → "2", "/гурав иргэний өмч/" → "3"',
-      '',
-      'OWNER NAME PATTERNS:',
-      'PATTERN A — contains "овогтой":',
-      '  "[CLAN] овгийн [SURNAME] овогтой [FIRSTNAME] [REGISTER]"',
-      '  → name = SURNAME + " " + FIRSTNAME',
-      '  Example: "Иижэн овгийн Дэмбэрэлсамбуу овогтой Алтанцэцэг ЦБ56050863"',
-      '  → name="Дэмбэрэлсамбуу Алтанцэцэг", register="ЦБ56050863"',
-      '',
-      'PATTERN B — "овгийн" WITHOUT "овогтой":',
-      '  "[CLAN] овгийн [SURNAME] [FIRSTNAME] [REGISTER]"',
-      '  → name = SURNAME + " " + FIRSTNAME  (IGNORE the CLAN word before овгийн)',
-      '  Example: "Хээр Данан овгийн Баяр Тэлмэн УТ06231710"',
-      '  → name="Баяр Тэлмэн", register="УТ06231710"',
-      '',
-      'MULTIPLE OWNERS: first owner → name+register, second owner → name2+register2',
-      '',
-      'register: exactly 2 Cyrillic uppercase letters + 8 digits. Example: ЦБ56050863, УТ06231710',
-      'address: full address including дүүрэг, хороо, байр, тоот',
-      'area: digits + м.кв before "талбайтай". Example: "43 м.кв"',
-      'cert: alphanumeric code near "гэрчилгээ олгов". Example: V-2204001484',
-      'purpose: text before "зориулалттай" or "зориулалтаар"',
-      '',
-      'Return ONLY the JSON object, no explanation.',
-    ].join('\n');
+    const parsePrompt = buildParsePrompt(rawText);
 
     const parseResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -226,12 +230,47 @@ app.post('/analyze', analyzeLimiter, upload.single('image'), async (req, res) =>
     if (parseData.error) throw new Error(parseData.error.message);
     const text = parseData.content?.[0]?.text || '{}';
     const extracted = JSON.parse(text.replace(/```json|```/g, '').trim());
-    res.json({ success: true, data: extracted });
+
+    // ── Серверт мэдэгдэж буй алдааг засах ──
+    // Cert: У- → Ү- (гэрчилгээний дугаар Ү-, Э-, Г- эхэлдэг, У- биш)
+    if (extracted.cert) {
+      extracted.cert = extracted.cert.replace(/^У-/i, 'Ү-');
+    }
+    // Register: УП → УТ (П регистрийн угтвар болж ирдэггүй)
+    const fixReg = r => r ? r.replace(/^УП/, 'УТ').replace(/^уп/i, 'УТ') : r;
+    extracted.register  = fixReg(extracted.register);
+    extracted.register2 = fixReg(extracted.register2);
+
+    res.json({ success: true, data: extracted, rawText });
   } catch (err) {
     if (req.file?.path) try { fs.unlinkSync(req.file.path); } catch (_) {}
     res.status(500).json({ error: 'Failed: ' + err.message });
   }
 });
+app.post('/parse-text', async (req, res) => {
+  const { rawText } = req.body;
+  if (!rawText) return res.status(400).json({ error: 'rawText missing' });
+  try {
+    const parsePrompt = buildParsePrompt(rawText);
+    const parseResponse = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: 'claude-opus-4-5', max_tokens: 1024, messages: [{ role: 'user', content: parsePrompt }] })
+    });
+    const parseData = await parseResponse.json();
+    if (parseData.error) throw new Error(parseData.error.message);
+    const text = parseData.content?.[0]?.text || '{}';
+    const extracted = JSON.parse(text.replace(/```json|```/g, '').trim());
+    if (extracted.cert) extracted.cert = extracted.cert.replace(/^У-/i, 'Ү-');
+    const fixReg = r => r ? r.replace(/^УП/, 'УТ') : r;
+    extracted.register  = fixReg(extracted.register);
+    extracted.register2 = fixReg(extracted.register2);
+    res.json({ success: true, data: extracted });
+  } catch(err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/generate', generateLimiter, async (req, res) => {
   const { type, subtype, data } = req.body;
   if (!type || !subtype || !data) return res.status(400).json({ error: 'Missing fields' });
