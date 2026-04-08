@@ -2,6 +2,7 @@
 const express = require('express');
 const compression = require('compression');
 const multer = require('multer');
+const sharp = require('sharp');
 const fs = require('fs');
 const { generateDocx } = require('./docxGenerator');
 const { getTemplate } = require('./templates');
@@ -110,13 +111,19 @@ function saveContract(contractData) {
 function writeContracts(data) {
   fs.writeFileSync(CONTRACTS_FILE, JSON.stringify(data, null, 2), 'utf-8');
 }
-const upload = multer({ dest: 'uploads/', limits: { fileSize: 10 * 1024 * 1024 } });
+const upload = multer({ dest: 'uploads/', limits: { fileSize: 20 * 1024 * 1024 } });
 app.post('/analyze', analyzeLimiter, upload.single('image'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No image uploaded' });
   try {
-    const imageData = fs.readFileSync(req.file.path);
-    const base64Image = imageData.toString('base64');
-    const mimeType = req.file.mimetype || 'image/jpeg';
+    let imageBuffer = fs.readFileSync(req.file.path);
+    if (imageBuffer.length > 4 * 1024 * 1024) {
+      imageBuffer = await sharp(imageBuffer)
+        .resize({ width: 2000, height: 2000, fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 85 })
+        .toBuffer();
+    }
+    const base64Image = imageBuffer.toString('base64');
+    const mimeType = 'image/jpeg';
     const prompt = [
       'You are an expert OCR for Mongolian property certificates. Carefully read the ENTIRE certificate.',
       '',
