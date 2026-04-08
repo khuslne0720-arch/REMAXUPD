@@ -221,21 +221,18 @@ app.post('/analyze', analyzeLimiter, upload.single('image'), async (req, res) =>
     let sharpImg = sharp(imageBuffer);
     const meta = await sharpImg.metadata();
 
-    // Зургийг дагнасан OCR-д зориулж сайжруулах
-    // 1. Хэт том бол багасгах — гэхдээ resolution хадгалах
-    if (meta.width > 3000 || meta.height > 3000) {
-      sharpImg = sharpImg.resize({ width: 3000, height: 3000, fit: 'inside', withoutEnlargement: true });
+    // Зургийг OCR-д зориулж сайжруулах
+    if (meta.width > 3500 || meta.height > 3500) {
+      sharpImg = sharpImg.resize({ width: 3500, height: 3500, fit: 'inside', withoutEnlargement: true });
     }
-    // 2. Grayscale → contrast нэмэх → sharpen → adaptive threshold (цагаан дэвсгэр, хар текст)
     imageBuffer = await sharpImg
       .grayscale()
-      .normalise()                                      // contrast автомат тэнцвэржүүлэх
-      .sharpen({ sigma: 2, m1: 1, m2: 5 })             // текст ирмэгийг тодруулах
-      .threshold(180)                                   // adaptive binarization — текст хар, дэвсгэр цагаан
-      .png()                                            // PNG = lossless, OCR-д JPEG-ээс дээр
+      .normalise()
+      .sharpen({ sigma: 1.5, m1: 0.5, m2: 3 })
+      .jpeg({ quality: 95 })
       .toBuffer();
     const base64Image = imageBuffer.toString('base64');
-    const mimeType = 'image/png';
+    const mimeType = 'image/jpeg';
 
     // ── Google Vision байвал ашиглах, үгүй бол Claude OCR ──
     let rawText = '';
