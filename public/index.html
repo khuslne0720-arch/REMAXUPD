@@ -346,6 +346,25 @@
         </div>
       </div>
 
+      <!-- Хамтран эзэмшигч (AI илрүүлсэн бол харуулна) -->
+      <div id="coownerBlock" style="display:none; margin-top:18px; padding:14px 16px; background:#eff6ff; border:1.5px solid #93c5fd; border-radius:8px;">
+        <div style="font-size:13px; font-weight:700; color:#1a3c5e; margin-bottom:4px;">
+          👥 Хамтран эзэмшигч илрүүлсэн
+          <span id="ownerCountBadge" style="background:#1a3c5e;color:#fff;border-radius:12px;padding:2px 10px;font-size:11px;margin-left:8px;"></span>
+        </div>
+        <div style="font-size:12px;color:#3b82f6;margin-bottom:12px;">AI гэрчилгээнээс автоматаар авсан — шалгаж засна уу</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>2-р эзэмшигчийн нэр <span class="ai-badge" id="badge_name2"></span></label>
+            <input type="text" id="f_name2" placeholder="Овог Нэр" />
+          </div>
+          <div class="form-group">
+            <label>2-р эзэмшигчийн регистр <span class="ai-badge" id="badge_register2"></span></label>
+            <input type="text" id="f_register2" placeholder="АА00000000" />
+          </div>
+        </div>
+      </div>
+
       <button class="btn-next" onclick="goToStep3()" style="
         margin-top:22px; width:100%; padding:13px;
         background:var(--primary); color:#fff; border:none;
@@ -544,15 +563,31 @@
         if (badge) badge.textContent = '';
       }
     });
-    // purpose, name2, register2 нь preview хуудаст очно — extractedData-д хадгалагдсан байна
-    if (data.purpose || data.name2 || data.ownerCount > 1) {
-      const aiTag = document.getElementById('aiTag');
-      if (aiTag) {
-        const extra = [];
-        if (data.purpose) extra.push('зориулалт');
-        if (data.name2)   extra.push('хамтран эзэмшигч');
-        if (extra.length) aiTag.textContent = `🤖 AI: ${extra.join(', ')} илрүүлсэн`;
-      }
+
+    // Хамтран эзэмшигч харуулах
+    const ownerCount = parseInt(data.ownerCount) || 1;
+    if (ownerCount >= 2 || data.name2) {
+      document.getElementById('coownerBlock').style.display = 'block';
+      const badge = document.getElementById('ownerCountBadge');
+      if (badge) badge.textContent = `${ownerCount} иргэний өмч`;
+
+      const n2 = document.getElementById('f_name2');
+      const r2 = document.getElementById('f_register2');
+      const b2n = document.getElementById('badge_name2');
+      const b2r = document.getElementById('badge_register2');
+      if (n2 && data.name2) { n2.value = data.name2; n2.classList.add('ai-filled'); if (b2n) b2n.textContent = 'AI'; }
+      if (r2 && data.register2) { r2.value = data.register2; r2.classList.add('ai-filled'); if (b2r) b2r.textContent = 'AI'; }
+    } else {
+      document.getElementById('coownerBlock').style.display = 'none';
+    }
+
+    // AI badge шинэчлэх
+    const aiTag = document.getElementById('aiTag');
+    if (aiTag) {
+      const extra = [];
+      if (data.purpose)  extra.push('зориулалт');
+      if (data.name2)    extra.push('хамтран эзэмшигч');
+      aiTag.textContent = extra.length ? `🤖 AI: ${extra.join(', ')} илрүүлсэн` : '🤖 AI дүүргэсэн';
     }
   }
 
@@ -620,8 +655,8 @@
       email:      document.getElementById('f_email').value.trim(),
       price:      document.getElementById('f_price').value.trim(),
       agent:      document.getElementById('f_agent').value.trim(),
-      name2:      extractedData.name2      || '',
-      register2:  extractedData.register2  || '',
+      name2:      document.getElementById('f_name2')?.value.trim()    || extractedData.name2      || '',
+      register2:  document.getElementById('f_register2')?.value.trim() || extractedData.register2  || '',
       ownerCount: extractedData.ownerCount || '',
       purpose:    extractedData.purpose    || '',
     };
