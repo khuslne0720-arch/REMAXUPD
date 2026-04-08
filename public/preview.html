@@ -65,15 +65,14 @@
       </div>
       <div class="form-group">
         <label>Эхлэх огноо</label>
-        <input type="date" id="startDate">
+        <input type="date" id="startDate" onchange="calcEndDate()">
       </div>
       <div class="form-group">
         <label>Гэрээний хугацаа (сар)</label>
-        <select id="durationMonths" style="border: 1.5px solid #dde3ee; border-radius: 8px; padding: 10px 12px; font-size: 14px; font-family: inherit; background: #fafbff; cursor: pointer;">
-          <option value="">-- Сар сонгох --</option>
+        <select id="duration" onchange="calcEndDate()" style="border:1.5px solid #dde3ee;border-radius:8px;padding:10px 12px;font-size:14px;font-family:inherit;background:#fafbff;">
           <option value="1">1 сар</option>
           <option value="2">2 сар</option>
-          <option value="3">3 сар</option>
+          <option value="3" selected>3 сар</option>
           <option value="4">4 сар</option>
           <option value="5">5 сар</option>
           <option value="6">6 сар</option>
@@ -84,8 +83,10 @@
           <option value="11">11 сар</option>
           <option value="12">12 сар</option>
         </select>
-        <input type="hidden" id="endDate">
-        <span id="endDateDisplay" style="font-size: 12px; color: #1a3c5e; margin-top: 4px;"></span>
+      </div>
+      <div class="form-group">
+        <label>Дуусах огноо (автомат)</label>
+        <input type="date" id="endDate" readonly style="background:#f0f0f0;cursor:not-allowed;">
       </div>
     </div>
   </div>
@@ -113,25 +114,6 @@
         <label>Хаяг</label>
         <textarea id="address" placeholder="Дүүрэг, хороо, байр, тоот"></textarea>
       </div>
-      <div class="form-group full">
-        <label>Эзэмшигчийн оршин суух хаяг</label>
-        <textarea id="residentialAddress" placeholder="Эзэмшигч оршин суух хаяг (гэрчилгээний хаягаас өөр бол)"></textarea>
-      </div>
-    </div>
-
-    <!-- Хамтран эзэмшигч -->
-    <div id="coownerSection" style="display:none; margin-top:16px; padding:14px; background:#eff6ff; border:1.5px solid #93c5fd; border-radius:8px;">
-      <div style="font-size:13px; font-weight:700; color:#1a3c5e; margin-bottom:10px;">👥 Хамтран эзэмшигч</div>
-      <div class="form-grid">
-        <div class="form-group">
-          <label>Эзэмшигчийн нэр</label>
-          <input type="text" id="name2" placeholder="Овог Нэр">
-        </div>
-        <div class="form-group">
-          <label>Регистрийн дугаар</label>
-          <input type="text" id="register2" placeholder="АА00000000">
-        </div>
-      </div>
     </div>
   </div>
 
@@ -146,42 +128,17 @@
         <label>Талбайн хэмжээ</label>
         <input type="text" id="area" placeholder="51.5 м²">
       </div>
-      <div class="form-group full">
-        <label>Хөрөнгийн зориулалт <span style="font-size:11px;color:#888;font-weight:400;">(AI автоматаар авна)</span></label>
-        <input type="text" id="purpose" placeholder="Орон сууцны зориулалттай">
-      </div>
       <div class="form-group">
         <label>Үнэ (төгрөг)</label>
-        <input type="text" id="price" placeholder="100,000,000" oninput="calcCommission()">
-      </div>
-
-      <!-- Шимтгэл -->
-      <div class="form-group" id="sellCommissionGroup" style="display:none">
-        <label>Шимтгэлийн хувь</label>
-        <select id="sellRate" onchange="calcCommission()" style="border:1.5px solid #dde3ee;border-radius:8px;padding:10px 12px;font-size:14px;font-family:inherit;background:#fafbff;cursor:pointer;">
-          <option value="">-- Сонгох --</option>
-          <option value="3.3">3.3%</option>
-          <option value="5.5">5.5%</option>
-        </select>
-      </div>
-
-      <div class="form-group" id="rentCommissionGroup" style="display:none">
-        <label>Түрээсийн хугацаа</label>
-        <select id="rentRate" onchange="calcCommission()" style="border:1.5px solid #dde3ee;border-radius:8px;padding:10px 12px;font-size:14px;font-family:inherit;background:#fafbff;cursor:pointer;">
-          <option value="">-- Сонгох --</option>
-          <option value="22">1–31 хоног (22%)</option>
-          <option value="55">32–180 хоног (55%)</option>
-          <option value="99">181+ хоног (99%)</option>
-        </select>
-      </div>
-
-      <div class="form-group" id="commissionResultGroup" style="display:none">
-        <label>Шимтгэлийн дүн (төгрөг)</label>
-        <input type="text" id="commissionAmount" readonly style="background:#f0fdf4;border-color:#86efac;font-weight:700;color:#166534;font-size:15px;">
+        <input type="text" id="price" placeholder="100,000,000">
       </div>
     </div>
   </div>
 
+  <div id="previewCard" class="card" style="display:none">
+    <div class="card-title">📋 Гэрээний preview</div>
+    <div id="previewBox" class="preview-box"></div>
+  </div>
 
   <div id="actionCard" class="card" style="display:none">
     <div class="btn-row">
@@ -211,14 +168,8 @@
     document.getElementById('typeInfo').style.display = 'block';
     document.getElementById('ownerCard').style.display = 'block';
     document.getElementById('propertyCard').style.display = 'block';
+    document.getElementById('previewCard').style.display = 'block';
     document.getElementById('actionCard').style.display = 'block';
-
-    // Шимтгэлийн сонголт харуулах
-    if (type === 'sell') {
-      document.getElementById('sellCommissionGroup').style.display = 'flex';
-    } else if (type === 'rent') {
-      document.getElementById('rentCommissionGroup').style.display = 'flex';
-    }
 
     // Badge тохируулах
     const typeNames = { sell: 'Худалдах', rent: 'Түрээслэх' };
@@ -227,26 +178,11 @@
       `🏠 ${typeNames[type] || type} — ${subtypeNames[subtype] || subtype}`;
 
     // Талбарт утга оруулах
-    const fields = ['name','register','address','residentialAddress','area','cert','purpose','phone','email','price','agent','contractNumber','startDate'];
+    const fields = ['name','register','address','area','cert','phone','email','price','agent','contractNumber','startDate','endDate'];
     fields.forEach(f => {
       const el = document.getElementById(f);
       if (el && formData[f]) el.value = formData[f];
     });
-
-    // Хамтран эзэмшигч
-    if (formData.name2 || formData.register2) {
-      document.getElementById('coownerSection').style.display = 'block';
-      if (formData.name2) document.getElementById('name2').value = formData.name2;
-      if (formData.register2) document.getElementById('register2').value = formData.register2;
-    }
-    document.getElementById('name2').addEventListener('input', () => { document.getElementById('coownerSection').style.display='block'; updatePreview(); });
-    document.getElementById('register2').addEventListener('input', updatePreview);
-
-    // duration байвал сонгох
-    if (formData.duration) {
-      const sel = document.getElementById('durationMonths');
-      if (sel) sel.value = formData.duration;
-    }
 
     // Өөрчлөлт хийхэд preview шинэчлэх
     fields.forEach(f => {
@@ -254,71 +190,34 @@
       if (el) el.addEventListener('input', updatePreview);
     });
 
-    document.getElementById('startDate').addEventListener('change', () => { calcEndDate(); updatePreview(); });
-    document.getElementById('durationMonths').addEventListener('change', () => { calcEndDate(); updatePreview(); });
-
-    calcEndDate();
     updatePreview();
-  }
-
-  function calcEndDate() {
-    const startVal = document.getElementById('startDate').value;
-    const months   = parseInt(document.getElementById('durationMonths').value);
-    if (!startVal || !months) return;
-
-    const [y, m, d] = startVal.split('-').map(Number);
-    const end = new Date(y, m - 1 + months, d);
-
-    const ey = end.getFullYear();
-    const em = String(end.getMonth() + 1).padStart(2, '0');
-    const ed = String(end.getDate()).padStart(2, '0');
-    const endStr = `${ey}-${em}-${ed}`;
-
-    document.getElementById('endDate').value = endStr;
-    document.getElementById('endDateDisplay').textContent =
-      `📅 Дуусах: ${ey} оны ${parseInt(em)}-р сарын ${parseInt(ed)}-ний өдөр`;
   }
 
   function getFormData() {
     return {
-      name:               document.getElementById('name').value,
-      register:           document.getElementById('register').value,
-      name2:              document.getElementById('name2')?.value || '',
-      register2:          document.getElementById('register2')?.value || '',
-      address:            document.getElementById('address').value,
-      residentialAddress: document.getElementById('residentialAddress')?.value || '',
-      area:               document.getElementById('area').value,
-      cert:               document.getElementById('cert').value,
-      purpose:            document.getElementById('purpose')?.value || '',
-      phone:              document.getElementById('phone').value,
-      email:              document.getElementById('email').value,
-      price:              document.getElementById('price').value,
-      agent:              document.getElementById('agent').value,
-      contractNumber:     document.getElementById('contractNumber').value,
-      startDate:          document.getElementById('startDate').value,
-      endDate:            document.getElementById('endDate').value,
-      duration:           document.getElementById('durationMonths').value,
-      commissionRate:     (document.getElementById('sellRate')?.value || document.getElementById('rentRate')?.value || ''),
-      commissionAmount:   document.getElementById('commissionAmount')?.value || '',
+      name: document.getElementById('name').value,
+      register: document.getElementById('register').value,
+      address: document.getElementById('address').value,
+      area: document.getElementById('area').value,
+      cert: document.getElementById('cert').value,
+      phone: document.getElementById('phone').value,
+      email: document.getElementById('email').value,
+      price: document.getElementById('price').value,
+      agent: document.getElementById('agent').value,
+      contractNumber: document.getElementById('contractNumber').value,
+      startDate: document.getElementById('startDate').value,
+      endDate: document.getElementById('endDate').value,
     };
   }
 
-  function calcCommission() {
-    const priceRaw = document.getElementById('price').value.replace(/[^0-9]/g, '');
-    const price = parseFloat(priceRaw) || 0;
-    const sellRate = document.getElementById('sellRate')?.value;
-    const rentRate = document.getElementById('rentRate')?.value;
-    const rate = parseFloat(sellRate || rentRate) || 0;
-    const resultGroup = document.getElementById('commissionResultGroup');
-
-    if (price > 0 && rate > 0) {
-      const commission = Math.round(price * rate / 100);
-      document.getElementById('commissionAmount').value = commission.toLocaleString('en-US') + ' ₮';
-      resultGroup.style.display = 'flex';
-      updatePreview();
-    } else {
-      resultGroup.style.display = 'none';
-    }
+  function calcEndDate() {
+    const start = document.getElementById('startDate').value;
+    const dur = parseInt(document.getElementById('duration').value);
+    if (!start) return;
+    const d = new Date(start);
+    d.setMonth(d.getMonth() + dur);
+    document.getElementById('endDate').value = d.toISOString().split('T')[0];
+    updatePreview();
   }
 
   async function updatePreview() {
@@ -330,7 +229,11 @@
         body: JSON.stringify({ type, subtype, data })
       });
       const result = await res.json();
+      if (result.preview) {
+        document.getElementById('previewBox').textContent = result.preview;
+      }
     } catch(e) {
+      document.getElementById('previewBox').textContent = 'Preview ачаалж байна...';
     }
   }
 
