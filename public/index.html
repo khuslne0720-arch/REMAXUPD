@@ -533,19 +533,45 @@
     fields.forEach(k => {
       const el = document.getElementById('f_' + k);
       const badge = document.getElementById('badge_' + k);
+      if (!el) return;
       if (data[k]) {
         el.value = data[k];
         el.classList.add('ai-filled');
-        badge.textContent = 'AI';
+        if (badge) badge.textContent = 'AI';
       } else {
         el.value = '';
         el.classList.remove('ai-filled');
-        badge.textContent = '';
+        if (badge) badge.textContent = '';
       }
     });
+    // purpose, name2, register2 нь preview хуудаст очно — extractedData-д хадгалагдсан байна
+    if (data.purpose || data.name2 || data.ownerCount > 1) {
+      const aiTag = document.getElementById('aiTag');
+      if (aiTag) {
+        const extra = [];
+        if (data.purpose) extra.push('зориулалт');
+        if (data.name2)   extra.push('хамтран эзэмшигч');
+        if (extra.length) aiTag.textContent = `🤖 AI: ${extra.join(', ')} илрүүлсэн`;
+      }
+    }
   }
 
   function goToStep3() {
+    // Validation: шаардлагатай талбарууд
+    const required = [
+      { id: 'f_name',     label: 'Овог нэр' },
+      { id: 'f_register', label: 'Регистрийн дугаар' },
+      { id: 'f_address',  label: 'Хаяг' },
+      { id: 'f_cert',     label: 'Гэрчилгээний дугаар' },
+    ];
+    for (const r of required) {
+      const el = document.getElementById(r.id);
+      if (!el || !el.value.trim()) {
+        showError(`"${r.label}" талбарыг бөглөнө үү.`);
+        el && el.focus();
+        return;
+      }
+    }
     showSection(3);
     markStep(2, 'done');
     markStep(3, 'active');
@@ -600,8 +626,13 @@
       purpose:    extractedData.purpose    || '',
     };
 
-    const encoded = encodeURIComponent(JSON.stringify(data));
-    window.location.href = `/preview.html?type=${contractType}&subtype=${contractSubtype}&data=${encoded}`;
+    // URL-д биш sessionStorage-т хадгалах (URL хэт урт болохоос сэргийлэх)
+    sessionStorage.setItem('contractPayload', JSON.stringify({
+      type: contractType,
+      subtype: contractSubtype,
+      data
+    }));
+    window.location.href = '/preview.html';
   }
 
   function setGenerating(on) {

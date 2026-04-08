@@ -198,16 +198,41 @@
 </div>
 
 <script>
-  // URL параметрээс өгөгдөл авах
-  const params = new URLSearchParams(window.location.search);
-  const type = params.get('type');
-  const subtype = params.get('subtype');
-  const dataParam = params.get('data');
-
+  // sessionStorage-аас өгөгдөл авах (URL param биш — crash болохоос сэргийлнэ)
+  let type, subtype;
   let formData = {};
 
-  if (dataParam) {
-    try { formData = JSON.parse(decodeURIComponent(dataParam)); } catch(e) {}
+  try {
+    const payload = JSON.parse(sessionStorage.getItem('contractPayload') || '{}');
+    type    = payload.type;
+    subtype = payload.subtype;
+    formData = payload.data || {};
+  } catch(e) {
+    // Хуучин URL param fallback
+    const params = new URLSearchParams(window.location.search);
+    type    = params.get('type');
+    subtype = params.get('subtype');
+    try { formData = JSON.parse(decodeURIComponent(params.get('data') || '{}')); } catch(_) {}
+  }
+
+  // Debounce: preview-г хэт олон дуудахаас сэргийлэх
+  let previewTimer = null;
+  function debouncedPreview() {
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(updatePreview, 500);
+  }
+
+  // contractNumber автоматаар авах
+  async function fetchNextContractNumber() {
+    if (!type || !subtype) return;
+    try {
+      const res = await fetch(`/next-contract-number?type=${type}&subtype=${subtype}`);
+      const json = await res.json();
+      const el = document.getElementById('contractNumber');
+      if (el && !el.value && json.contractNumber) {
+        el.value = json.contractNumber;
+      }
+    } catch(e) { /* silent */ }
   }
 
   if (type && subtype) {
@@ -231,11 +256,6 @@
     document.getElementById('typeBadge').textContent =
       `🏠 ${typeNames[type] || type} — ${subtypeNames[subtype] || subtype}`;
 
-    fetch(`/next-contract-number?type=${type}&subtype=${subtype}`)
-      .then(r => r.json())
-      .then(d => { if (d.contractNumber && !formData.contractNumber) document.getElementById('contractNumber').value = d.contractNumber; })
-      .catch(() => {});
-
     // Талбарт утга оруулах
     const fields = ['name','register','address','residentialAddress','area','cert','purpose','phone','email','price','agent','contractNumber','startDate'];
     fields.forEach(f => {
@@ -249,8 +269,8 @@
       if (formData.name2) document.getElementById('name2').value = formData.name2;
       if (formData.register2) document.getElementById('register2').value = formData.register2;
     }
-    document.getElementById('name2').addEventListener('input', () => { document.getElementById('coownerSection').style.display='block'; updatePreview(); });
-    document.getElementById('register2').addEventListener('input', updatePreview);
+    document.getElementById('name2').addEventListener('input', () => { document.getElementById('coownerSection').style.display='block'; debouncedPreview(); });
+    document.getElementById('register2').addEventListener('input', debouncedPreview);
 
     // duration байвал сонгох
     if (formData.duration) {
@@ -258,14 +278,17 @@
       if (sel) sel.value = formData.duration;
     }
 
-    // Өөрчлөлт хийхэд preview шинэчлэх
+    // Өөрчлөлт хийхэд preview debounce-тайгаар шинэчлэх
     fields.forEach(f => {
       const el = document.getElementById(f);
-      if (el) el.addEventListener('input', updatePreview);
+      if (el) el.addEventListener('input', debouncedPreview);
     });
 
-    document.getElementById('startDate').addEventListener('change', () => { calcEndDate(); updatePreview(); });
-    document.getElementById('durationMonths').addEventListener('change', () => { calcEndDate(); updatePreview(); });
+    document.getElementById('startDate').addEventListener('change', () => { calcEndDate(); debouncedPreview(); });
+    document.getElementById('durationMonths').addEventListener('change', () => { calcEndDate(); debouncedPreview(); });
+
+    // contractNumber байхгүй бол автоматаар авах
+    if (!formData.contractNumber) fetchNextContractNumber();
 
     calcEndDate();
     updatePreview();
