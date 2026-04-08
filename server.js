@@ -116,16 +116,22 @@ app.post('/analyze', analyzeLimiter, upload.single('image'), async (req, res) =>
   if (!req.file) return res.status(400).json({ error: 'No image uploaded' });
   try {
     let imageBuffer = fs.readFileSync(req.file.path);
-    if (imageBuffer.length > 4 * 1024 * 1024) {
-      imageBuffer = await sharp(imageBuffer)
-        .resize({ width: 2000, height: 2000, fit: 'inside', withoutEnlargement: true })
-        .jpeg({ quality: 85 })
-        .toBuffer();
+    // Зургийг OCR-д зориулж сайжруулах: resize + grayscale + contrast + sharpen
+    let sharpImg = sharp(imageBuffer);
+    const meta = await sharpImg.metadata();
+    if (meta.width > 3500 || meta.height > 3500) {
+      sharpImg = sharpImg.resize({ width: 3500, height: 3500, fit: 'inside', withoutEnlargement: true });
     }
+    imageBuffer = await sharpImg
+      .grayscale()
+      .normalise()
+      .sharpen({ sigma: 1.5, m1: 0.5, m2: 3 })
+      .jpeg({ quality: 95 })
+      .toBuffer();
     const base64Image = imageBuffer.toString('base64');
     const mimeType = 'image/jpeg';
     const prompt = [
-      'You are an expert OCR for Mongolian property certificates. Carefully read the ENTIRE certificate.',
+      'You are an expert OCR for Mongolian property certificates. The image has been preprocessed (grayscale, contrast enhanced, sharpened) for better readability. Carefully read the ENTIRE certificate.',
       '',
       'Return ONLY this JSON, no explanation, no markdown:',
       '{"name":"","register":"","name2":"","register2":"","ownerCount":"","address":"","area":"","cert":"","purpose":""}',
