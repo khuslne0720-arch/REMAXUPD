@@ -226,7 +226,6 @@ app.post('/analyze', analyzeLimiter, upload.single('image'), async (req, res) =>
     if (imageBuffer.length > 5 * 1024 * 1024) {
       sharpImg = sharpImg.resize({ width: 3500, height: 3500, fit: 'inside', withoutEnlargement: true });
     }
-    // Center crop — border, тамга, гарын үсэг зэрэг noise-г хасах
     const cropMeta = await sharpImg.clone().metadata();
     const cw = cropMeta.width  || meta.width;
     const ch = cropMeta.height || meta.height;
@@ -240,8 +239,13 @@ app.post('/analyze', analyzeLimiter, upload.single('image'), async (req, res) =>
       .grayscale()
       .normalise()
       .sharpen({ sigma: 1.5, m1: 0.5, m2: 3 })
-      .jpeg({ quality: 95 })
+      .jpeg({ quality: 90 })   // Claude API 5MB лимитэд багтаахын тулд compress хийнэ
       .toBuffer();
+
+    // Claude API-д 5MB-аас хэтэрсэн бол чанараа бууруулж дахин compress
+    if (imageBuffer.length > 5 * 1024 * 1024) {
+      imageBuffer = await sharp(imageBuffer).jpeg({ quality: 70 }).toBuffer();
+    }
     const base64Image = imageBuffer.toString('base64');
     const mimeType = 'image/jpeg';
 
