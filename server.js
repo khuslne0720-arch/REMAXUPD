@@ -137,23 +137,12 @@ async function googleVisionOCR(base64Image) {
 // ── Claude OCR (fallback) ──
 async function claudeOCR(base64Image, mimeType) {
   const ocrPrompt = [
-    'You are a precise OCR engine for official Mongolian government property certificates.',
-    'These certificates use a special decorative calligraphic font. Read EVERY character with maximum care.',
-    'The image has been preprocessed: grayscale, contrast enhanced, sharpened, binarized (black text on white).',
+    'You are transcribing an official Mongolian property certificate (гэрчилгээ).',
+    'Read the ENTIRE text verbatim, character by character. Output plain text only.',
     '',
-    'CRITICAL font confusion pairs:',
-    '  Ц vs У — Ц has a small descender/tail at bottom-right. У does not.',
-    '  Т vs П — Т has ONE vertical stroke. П has TWO.',
-    '  Ү vs У — Ү has TWO dots above. У has none.',
-    '  Ю vs И — Ю has a vertical bar on LEFT connecting two curves. И has no left bar. УЮ not УИ.',
-    '  Ц vs Ч — Ц has a descender at bottom-right. Ч does not. Write ИЦ not ИЧ.',
-    '  х vs т — х has two crossing diagonal strokes. т has a horizontal top bar. "хишиг" not "түнии".',
-    '  я vs л — я curves right at top. л is straight diagonal.',
-    '  лм cluster — never skip л before м (Тэлмэн not Тэмэн).',
-    '  ц vs з, э vs о, н vs и, ү vs у, ө vs о',
-    '',
-    'TASK: Transcribe the ENTIRE certificate text verbatim, character by character.',
-    'Output plain text only — no JSON, no markdown, no commentary.',
+    'Key font confusion pairs to watch:',
+    '  Ц vs У (Ц has bottom-right tail), Т vs П (Т=1 stroke, П=2), Ү vs У (Ү has dots)',
+    '  Ш vs Т, Ю vs И, Ц vs Ч, 2 vs 9, х vs т',
   ].join('\n');
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -247,33 +236,18 @@ app.post('/analyze', analyzeLimiter, upload.single('image'), async (req, res) =>
     let sharpImg = sharp(imageBuffer);
     const meta = await sharpImg.metadata();
 
-    // Зургийг OCR-д зориулж сайжруулах
-    // 5MB-аас том бол л багасгана, жижиг зургийг хэвээр үлдээнэ
+    // Preprocessing: зөвхөн 5MB шалгах + grayscale + sharpen
     if (imageBuffer.length > 5 * 1024 * 1024) {
-      sharpImg = sharpImg.resize({ width: 3500, height: 3500, fit: 'inside', withoutEnlargement: true });
+      sharpImg = sharpImg.resize({ width: 3000, height: 3000, fit: 'inside', withoutEnlargement: true });
     }
-    const cropMeta = await sharpImg.clone().metadata();
-    const cw = cropMeta.width  || meta.width;
-    const ch = cropMeta.height || meta.height;
-    sharpImg = sharpImg.extract({
-      left:   Math.round(cw * 0.06),
-      top:    Math.round(ch * 0.12),
-      width:  Math.round(cw * 0.88),
-      height: Math.round(ch * 0.78),
-    });
-    // Crop хийсний дараах хэмжээ
-    const cropW = Math.round(cw * 0.88);
-    // Жижиг зураг (<1500px) бол 2x upscale, том зураг бол 2000px-д багасгана
-    const targetW = cropW < 1500 ? cropW * 2 : Math.min(cropW, 2000);
     imageBuffer = await sharpImg
       .grayscale()
       .normalise()
-      .resize({ width: targetW, kernel: sharp.kernel.cubic })
       .sharpen({ sigma: 1.5, m1: 0.5, m2: 3 })
-      .jpeg({ quality: 85 })
+      .jpeg({ quality: 90 })
       .toBuffer();
 
-    // Claude API-д 5MB-аас хэтэрсэн бол чанараа бууруулж дахин compress
+    // Compress хэрэв хэтэрсэн бол
     if (imageBuffer.length > 5 * 1024 * 1024) {
       imageBuffer = await sharp(imageBuffer).jpeg({ quality: 70 }).toBuffer();
     }
