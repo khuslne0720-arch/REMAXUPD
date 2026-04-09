@@ -198,6 +198,9 @@ function buildParsePrompt(rawText) {
     '  → name = SURNAME + " " + FIRSTNAME',
     '  Example: "Иижэн овгийн Дэмбэрэлсамбуу овогтой Алтанцэцэг ЦБ56050863"',
     '  → name="Дэмбэрэлсамбуу Алтанцэцэг", register="ЦБ56050863"',
+    '  CRITICAL NAME ENDING: "цэцэг" (flower) is a very common Mongolian name ending.',
+    '  In this font "цэц" is often misread as "зуу" or "зуус". If you see "Алтанзуус", "Мөнхзуус", correct to "Алтанцэцэг", "Мөнхцэцэг".',
+    '  The ending -зуус does NOT exist in Mongolian names. Always correct to -цэцэг.',
     '',
     'PATTERN B — "овгийн" WITHOUT "овогтой":',
     '  "[CLAN] овгийн [SURNAME] [FIRSTNAME] [REGISTER]"',
@@ -311,6 +314,11 @@ app.post('/analyze', analyzeLimiter, upload.single('image'), async (req, res) =>
       const certM = extracted.cert.match(/[VҮЭГYvүэг]-[\d]+/i);
       if (certM) extracted.cert = certM[0];
     }
+
+    // Нэрний алдаа засах — -зуус гэдэг Монгол нэрэнд байдаггүй, -цэцэг байх ёстой
+    const fixName = (n) => n ? n.replace(/зуус$/i, 'цэцэг').replace(/Зуус$/i, 'цэцэг') : n;
+    extracted.name  = fixName(extracted.name);
+    extracted.name2 = fixName(extracted.name2);
 
     res.json({ success: true, data: extracted, rawText });
   } catch (err) {
