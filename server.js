@@ -145,6 +145,8 @@ async function claudeOCR(base64Image, mimeType) {
     '  Ц vs У — Ц has a small descender/tail at bottom-right. У does not.',
     '  Т vs П — Т has ONE vertical stroke. П has TWO.',
     '  Ү vs У — Ү has TWO dots above. У has none.',
+    '  Ю vs И — Ю has a vertical bar on LEFT connecting two curves. И has no left bar. УЮ not УИ.',
+    '  Ц vs Ч — Ц has a descender at bottom-right. Ч does not. Write ИЦ not ИЧ.',
     '  я vs л — я curves right at top. л is straight diagonal.',
     '  лм cluster — never skip л before м (Тэлмэн not Тэмэн).',
     '  ц vs з, э vs о, н vs и, ү vs у, ө vs о',
@@ -238,8 +240,10 @@ app.post('/analyze', analyzeLimiter, upload.single('image'), async (req, res) =>
     imageBuffer = await sharpImg
       .grayscale()
       .normalise()
+      // Upscale 2x — каллиграф штрихийг томруулна, OCR нарийн үсгийг тодорхой харна
+      .resize({ width: Math.round(cw * 0.88 * 2), kernel: sharp.kernel.cubic })
       .sharpen({ sigma: 1.5, m1: 0.5, m2: 3 })
-      .jpeg({ quality: 90 })   // Claude API 5MB лимитэд багтаахын тулд compress хийнэ
+      .jpeg({ quality: 85 })
       .toBuffer();
 
     // Claude API-д 5MB-аас хэтэрсэн бол чанараа бууруулж дахин compress
@@ -282,8 +286,11 @@ app.post('/analyze', analyzeLimiter, upload.single('image'), async (req, res) =>
     // Register regex шалгах: 2 Кирилл том үсэг + 8 цифр
     const fixRegister = (r) => {
       if (!r) return r;
-      r = r.replace(/^УП/, 'УТ');
-      // Regex-ээр зөв хэлбэрт оруулах оролдлого
+      // Мэдэгдэж буй confusion pair-үүд
+      r = r.replace(/^УП/, 'УТ');   // П→Т
+      r = r.replace(/^ИЧ/, 'ИЦ');   // Ч→Ц
+      r = r.replace(/^УИ/, 'УЮ');   // И→Ю (УЮ08706152 гэх мэт)
+      // Regex-ээр зөв хэлбэрт оруулах: 2 том Кирилл + 8 цифр
       const m = r.match(/([А-ЯӨҮЁа-яөүё]{2})(\d{8})/u);
       return m ? (m[1].toUpperCase() + m[2]) : r;
     };
