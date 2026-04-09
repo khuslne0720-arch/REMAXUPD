@@ -222,9 +222,20 @@ app.post('/analyze', analyzeLimiter, upload.single('image'), async (req, res) =>
     const meta = await sharpImg.metadata();
 
     // Зургийг OCR-д зориулж сайжруулах
-    if (meta.width > 3500 || meta.height > 3500) {
+    // 5MB-аас том бол л багасгана, жижиг зургийг хэвээр үлдээнэ
+    if (imageBuffer.length > 5 * 1024 * 1024) {
       sharpImg = sharpImg.resize({ width: 3500, height: 3500, fit: 'inside', withoutEnlargement: true });
     }
+    // Center crop — border, тамга, гарын үсэг зэрэг noise-г хасах
+    const cropMeta = await sharpImg.clone().metadata();
+    const cw = cropMeta.width  || meta.width;
+    const ch = cropMeta.height || meta.height;
+    sharpImg = sharpImg.extract({
+      left:   Math.round(cw * 0.06),
+      top:    Math.round(ch * 0.12),
+      width:  Math.round(cw * 0.88),
+      height: Math.round(ch * 0.78),
+    });
     imageBuffer = await sharpImg
       .grayscale()
       .normalise()
@@ -259,15 +270,33 @@ app.post('/analyze', analyzeLimiter, upload.single('image'), async (req, res) =>
     const text = parseData.content?.[0]?.text || '{}';
     const extracted = JSON.parse(text.replace(/```json|```/g, '').trim());
 
-    // ── Серверт мэдэгдэж буй алдааг засах ──
-    // Cert: У- → Ү- (гэрчилгээний дугаар Ү-, Э-, Г- эхэлдэг, У- биш)
+    // ── Серверт мэдэгдэж буй алдааг засах + regex validation ──
+    // Cert: У- → Ү-
     if (extracted.cert) {
       extracted.cert = extracted.cert.replace(/^У-/i, 'Ү-');
     }
-    // Register: УП → УТ (П регистрийн угтвар болж ирдэггүй)
-    const fixReg = r => r ? r.replace(/^УП/, 'УТ').replace(/^уп/i, 'УТ') : r;
-    extracted.register  = fixReg(extracted.register);
-    extracted.register2 = fixReg(extracted.register2);
+    // Register regex шалгах: 2 Кирилл том үсэг + 8 цифр
+    const fixRegister = (r) => {
+      if (!r) return r;
+      r = r.replace(/^УП/, 'УТ');
+      // Regex-ээр зөв хэлбэрт оруулах оролдлого
+      const m = r.match(/([А-ЯӨҮЁа-яөүё]{2})(\d{8})/u);
+      return m ? (m[1].toUpperCase() + m[2]) : r;
+    };
+    extracted.register  = fixRegister(extracted.register);
+    extracted.register2 = fixRegister(extracted.register2);
+
+    // Area: "43 м.кв" хэлбэр шалгах
+    if (extracted.area) {
+      const areaM = extracted.area.match(/(\d+[\.,]?\d*)\s*м/i);
+      if (areaM) extracted.area = areaM[1] + ' м.кв';
+    }
+    // Cert format: V- эсвэл Ү- эхэлсэн байх
+    if (extracted.cert && !/^[VҮЭГYvүэг]-/i.test(extracted.cert)) {
+      // Зөв формат олдоогүй бол цэвэрлэж орхих
+      const certM = extracted.cert.match(/[VҮЭГYvүэг]-[\d]+/i);
+      if (certM) extracted.cert = certM[0];
+    }
 
     res.json({ success: true, data: extracted, rawText });
   } catch (err) {
