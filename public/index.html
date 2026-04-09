@@ -341,7 +341,9 @@
           <input type="email" id="f_email" placeholder="example@mail.mn" />
         </div>
         <div class="form-group" style="grid-column: 1/-1;">
-          <label>Үнэ (төгрөгөөр)</label>
+          <label>Эзэмшигчийн оршин суух хаяг</label>
+          <input type="text" id="f_residentialAddress" placeholder="Гэрчилгээний хаягаас өөр бол оруулна уу" />
+        </div>
           <input type="text" id="f_price" placeholder="150,000,000" oninput="formatPrice(this)" />
         </div>
         <div class="form-group" style="grid-column: 1/-1;">
@@ -633,6 +635,7 @@
       name:       document.getElementById('f_name').value.trim(),
       register:   document.getElementById('f_register').value.trim(),
       address:    document.getElementById('f_address').value.trim(),
+      residentialAddress: document.getElementById('f_residentialAddress')?.value.trim() || '',
       area:       document.getElementById('f_area').value.trim(),
       rooms:      document.getElementById('f_rooms')?.value.trim() || '',
       cert:       document.getElementById('f_cert').value.trim(),
