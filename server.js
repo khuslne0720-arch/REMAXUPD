@@ -173,7 +173,7 @@ function buildParsePrompt(rawText) {
   return [
     'You are an expert parser for Mongolian property certificate text.',
     'Below is the raw OCR text from a certificate. Extract the fields and return ONLY this JSON:',
-    '{"name":"","register":"","name2":"","register2":"","ownerCount":"","address":"","area":"","cert":"","purpose":""}',
+    '{"name":"","register":"","name2":"","register2":"","ownerCount":"","address":"","area":"","rooms":"","cert":"","purpose":""}',
     '',
     '--- RAW TEXT ---',
     rawText,
@@ -225,6 +225,7 @@ function buildParsePrompt(rawText) {
     '  CRITICAL: Copy the register number EXACTLY as it appears in the text. Do NOT reorder or change any digits.',
     'address: full address including дүүрэг, хороо, байр, тоот',
     'area: digits + м.кв before "талбайтай". Example: "43 м.кв"',
+    'rooms: number of rooms before "өрөө". нэг=1, хоёр=2, гурав=3, дөрөв=4. Example: "2"',
     'cert: alphanumeric code near "гэрчилгээ олгов". Starts with Ү-, Э-, Г-, Y-, V-. Example: Ү-2204001484, V-2204155889',
     'purpose: text before "зориулалттай" or "зориулалтаар"',
     '',

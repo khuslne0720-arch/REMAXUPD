@@ -325,6 +325,10 @@
           <input type="text" id="f_area" placeholder="65.4" />
         </div>
         <div class="form-group">
+          <label>Өрөөний тоо <span class="ai-badge" id="badge_rooms"></span></label>
+          <input type="text" id="f_rooms" placeholder="2" />
+        </div>
+        <div class="form-group">
           <label>Гэрчилгээний дугаар <span class="ai-badge" id="badge_cert"></span></label>
           <input type="text" id="f_cert" placeholder="УБ-123456" />
         </div>
@@ -522,7 +526,7 @@
   }
 
   function populateForm(data) {
-    const fields = ['name', 'register', 'address', 'area', 'cert'];
+    const fields = ['name', 'register', 'address', 'area', 'cert', 'rooms'];
     fields.forEach(k => {
       const el = document.getElementById('f_' + k);
       const badge = document.getElementById('badge_' + k);
@@ -630,6 +634,7 @@
       register:   document.getElementById('f_register').value.trim(),
       address:    document.getElementById('f_address').value.trim(),
       area:       document.getElementById('f_area').value.trim(),
+      rooms:      document.getElementById('f_rooms')?.value.trim() || '',
       cert:       document.getElementById('f_cert').value.trim(),
       phone:      document.getElementById('f_phone').value.trim(),
       email:      document.getElementById('f_email').value.trim(),
