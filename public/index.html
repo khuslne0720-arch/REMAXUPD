@@ -483,46 +483,13 @@
     dropZone.style.display = 'block';
   }
 
-  // ── Analyze ──
-  function preprocessImage(file) {
-    return new Promise((resolve) => {
-      const img = new Image();
-      const url = URL.createObjectURL(file);
-      img.onload = () => {
-        // Зургийг багасгах (хэрэв хэт том бол)
-        const MAX = 1800;
-        let w = img.width, h = img.height;
-        if (w > MAX || h > MAX) {
-          if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
-          else { w = Math.round(w * MAX / h); h = MAX; }
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = w; canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, w, h);
-        // Grayscale + contrast
-        const id = ctx.getImageData(0, 0, w, h);
-        const d = id.data;
-        for (let i = 0; i < d.length; i += 4) {
-          const g = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
-          const c = Math.min(255, Math.max(0, (g - 128) * 1.4 + 128));
-          d[i] = d[i+1] = d[i+2] = c;
-        }
-        ctx.putImageData(id, 0, 0);
-        URL.revokeObjectURL(url);
-        canvas.toBlob(resolve, 'image/jpeg', 0.75);
-      };
-      img.src = url;
-    });
-  }
-
+  // ── Analyze — зургийг шууд серверт илгээх (frontend preprocessing хасав) ──
   async function analyzeImage() {
     if (!selectedFile) return;
     setAnalyzing(true);
 
-    const processedBlob = await preprocessImage(selectedFile);
     const form = new FormData();
-    form.append('image', processedBlob, 'image.jpg');
+    form.append('image', selectedFile);
 
     try {
       const res = await fetch('/analyze', { method: 'POST', body: form });
@@ -539,33 +506,6 @@
     } finally {
       setAnalyzing(false);
     }
-  }
-
-  async function confirmRawText() {
-    const correctedText = document.getElementById('rawTextArea').value.trim();
-    if (!correctedText) { showError('Текст хоосон байна.'); return; }
-
-    // Хэрэглэгч засвар хийсэн бол дахин задлуулна
-    const originalRaw = (extractedData._rawText || '');
-    if (correctedText !== originalRaw) {
-      const btn = document.querySelector('#sec1b button:last-child');
-      btn.disabled = true; btn.textContent = 'Задалж байна...';
-      try {
-        const res = await fetch('/parse-text', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ rawText: correctedText })
-        });
-        const json = await res.json();
-        if (json.data) extractedData = json.data;
-      } catch(_) { /* алдаа гарвал өмнөх extractedData ашиглана */ }
-      finally { btn.disabled = false; btn.textContent = 'Зөв байна — Үргэлжлүүлэх →'; }
-    }
-
-    populateForm(extractedData);
-    showSection(2);
-    markStep('1b', 'done');
-    markStep(2, 'active');
   }
 
   function goBackToUpload() {
