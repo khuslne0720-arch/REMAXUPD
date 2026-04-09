@@ -147,6 +147,7 @@ async function claudeOCR(base64Image, mimeType) {
     '  Ү vs У — Ү has TWO dots above. У has none.',
     '  Ю vs И — Ю has a vertical bar on LEFT connecting two curves. И has no left bar. УЮ not УИ.',
     '  Ц vs Ч — Ц has a descender at bottom-right. Ч does not. Write ИЦ not ИЧ.',
+    '  х vs т — х has two crossing diagonal strokes. т has a horizontal top bar. "хишиг" not "түнии".',
     '  я vs л — я curves right at top. л is straight diagonal.',
     '  лм cluster — never skip л before м (Тэлмэн not Тэмэн).',
     '  ц vs з, э vs о, н vs и, ү vs у, ө vs о',
@@ -217,7 +218,8 @@ function buildParsePrompt(rawText) {
     '  Эрэгтэй: Бат-Эрдэнэ, Отгонбаяр, Батбаяр, Лхагвасүрэн, Мөнх-Эрдэнэ,',
     '    Гантулга, Ганболд, Ганбаатар, Баярсайхан, Ганзориг, Батжаргал, Батсайхан,',
     '    Тэмүүлэн, Энхболд, Мөнхбаяр, Батмөнх, Дорж, Пүрэв, Сүрэн, Цэрэн,',
-    '    Жаргал, Баатар, Болд, Энхтайван, Батхүү, Мөнхбат, Ганхуяг, Батхишиг',
+    '    Жаргал, Баатар, Болд, Энхтайван, Батхүү, Мөнхбат, Ганхуяг, Батхишиг,',
+    '    Эрдэнэхишиг, Пагваа, Гансүх, Түвшинтөгс, Золзаяа, Амарзаяа',
     '  ДАГАВАР ДҮРЭМ: -зуус гэж дуусах нэр байдаггүй → -цэцэг болгон засах',
     '    Жишээ: Алтанзуус→Алтанцэцэг, Наранзуус→Наранцэцэг, Оюунзуус→Оюунцэцэг',
     '',
@@ -331,11 +333,11 @@ app.post('/analyze', analyzeLimiter, upload.single('image'), async (req, res) =>
       const areaM = extracted.area.match(/(\d+[\.,]?\d*)\s*м/i);
       if (areaM) extracted.area = areaM[1] + ' м.кв';
     }
-    // Cert format: V- эсвэл Ү- эхэлсэн байх
-    if (extracted.cert && !/^[VҮЭГYvүэг]-/i.test(extracted.cert)) {
-      // Зөв формат олдоогүй бол цэвэрлэж орхих
-      const certM = extracted.cert.match(/[VҮЭГYvүэг]-[\d]+/i);
-      if (certM) extracted.cert = certM[0];
+    // Cert format: V-/Ү- + яг 10 цифр
+    if (extracted.cert) {
+      extracted.cert = extracted.cert.replace(/^У-/i, 'Ү-');
+      const certM = extracted.cert.match(/([VҮЭГYvүэг])-(\d{10})/i);
+      if (certM) extracted.cert = certM[1].toUpperCase() + '-' + certM[2];
     }
 
     // Нэрний алдаа засах — -зуус гэдэг Монгол нэрэнд байдаггүй, -цэцэг байх ёстой
