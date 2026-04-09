@@ -237,11 +237,14 @@ app.post('/analyze', analyzeLimiter, upload.single('image'), async (req, res) =>
       width:  Math.round(cw * 0.88),
       height: Math.round(ch * 0.78),
     });
+    // Crop хийсний дараах хэмжээ
+    const cropW = Math.round(cw * 0.88);
+    // Жижиг зураг (<1500px) бол 2x upscale, том зураг бол 2000px-д багасгана
+    const targetW = cropW < 1500 ? cropW * 2 : Math.min(cropW, 2000);
     imageBuffer = await sharpImg
       .grayscale()
       .normalise()
-      // Upscale 2x — каллиграф штрихийг томруулна, OCR нарийн үсгийг тодорхой харна
-      .resize({ width: Math.round(cw * 0.88 * 2), kernel: sharp.kernel.cubic })
+      .resize({ width: targetW, kernel: sharp.kernel.cubic })
       .sharpen({ sigma: 1.5, m1: 0.5, m2: 3 })
       .jpeg({ quality: 85 })
       .toBuffer();
