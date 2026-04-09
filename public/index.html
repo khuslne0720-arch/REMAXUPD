@@ -333,6 +333,10 @@
           <label>Гэрчилгээний дугаар <span class="ai-badge" id="badge_cert"></span></label>
           <input type="text" id="f_cert" placeholder="УБ-123456" />
         </div>
+        <div class="form-group" style="grid-column: 1/-1;">
+          <label>Хөрөнгийн зориулалт <span class="ai-badge" id="badge_purpose"></span></label>
+          <input type="text" id="f_purpose" placeholder="Орон сууцны зориулалттай" />
+        </div>
         <div class="form-group">
           <label>Утасны дугаар</label>
           <input type="text" id="f_phone" placeholder="9900-0000" />
@@ -530,7 +534,7 @@
   }
 
   function populateForm(data) {
-    const fields = ['name', 'register', 'address', 'area', 'cert', 'rooms'];
+    const fields = ['name', 'register', 'address', 'area', 'cert', 'rooms', 'purpose'];
     fields.forEach(k => {
       const el = document.getElementById('f_' + k);
       const badge = document.getElementById('badge_' + k);
@@ -668,7 +672,7 @@
       name2:      document.getElementById('f_name2')?.value.trim()    || extractedData.name2      || '',
       register2:  document.getElementById('f_register2')?.value.trim() || extractedData.register2  || '',
       ownerCount: extractedData.ownerCount || '',
-      purpose:    extractedData.purpose    || '',
+      purpose:    document.getElementById('f_purpose')?.value.trim() || extractedData.purpose || '',
     };
 
     // URL-д биш sessionStorage-т хадгалах (URL хэт урт болохоос сэргийлэх)
