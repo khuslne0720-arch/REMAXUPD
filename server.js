@@ -144,6 +144,8 @@ async function claudeOCR(base64Image, mimeType) {
     '  Ц vs У (Ц has bottom-right tail), Т vs П (Т=1 stroke, П=2), Ү vs У (Ү has dots)',
     '  Ш vs Т, Ю vs И, Ц vs Ч, 2 vs 9, х vs т',
     '  П vs Н — П has TWO vertical strokes with top bar. Н has crossbar in MIDDLE. "Пагваа" not "Нагваа".',
+    '  э vs ө — э opens to the RIGHT. ө is closed circle with dots. "Тэлмэн" not "Төхөм".',
+    '  л vs х — л has a diagonal stroke going down-right. х has two CROSSING strokes.',
   ].join('\n');
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -316,9 +318,12 @@ app.post('/analyze', analyzeLimiter, upload.single('image'), async (req, res) =>
     // Нэрний алдаа засах
     const fixName = (n) => {
       if (!n) return n;
-      n = n.replace(/зуус$/i, 'цэцэг').replace(/Зуус$/i, 'цэцэг'); // -зуус → -цэцэг
-      n = n.replace(/^Нагваа/, 'Пагваа'); // П→Н confusion
+      n = n.replace(/зуус$/i, 'цэцэг').replace(/Зуус$/i, 'цэцэг');
+      n = n.replace(/^Нагваа/, 'Пагваа');
       n = n.replace(/^Нагва /, 'Пагваа ');
+      // Тэлмэн нэр давтан буруу уншигдаж байна
+      n = n.replace(/Төхөм$/i, 'Тэлмэн');
+      n = n.replace(/Тохом$/i, 'Тэлмэн');
       return n;
     };
     extracted.name  = fixName(extracted.name);
