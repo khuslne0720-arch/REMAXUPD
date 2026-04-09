@@ -222,6 +222,7 @@ function buildParsePrompt(rawText) {
     '  → name="Пагваа Эрдэнэхүү", register="ХП75092868", name2="Эрдэнэхүү Золзаяа", register2="ТЗ81082305", ownerCount="3"',
     '',
     'register: exactly 2 Cyrillic uppercase letters + 8 digits. Example: ЦБ56050863, УТ06231710',
+    '  CRITICAL: Copy the register number EXACTLY as it appears in the text. Do NOT reorder or change any digits.',
     'address: full address including дүүрэг, хороо, байр, тоот',
     'area: digits + м.кв before "талбайтай". Example: "43 м.кв"',
     'cert: alphanumeric code near "гэрчилгээ олгов". Starts with Ү-, Э-, Г-, Y-, V-. Example: Ү-2204001484, V-2204155889',
