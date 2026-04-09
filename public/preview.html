@@ -182,14 +182,8 @@
     </div>
   </div>
 
-  <div id="previewCard" class="card" style="display:none">
-    <div class="card-title">📋 Гэрээний preview</div>
-    <div id="previewBox" class="preview-box"></div>
-  </div>
-
   <div id="actionCard" class="card" style="display:none">
     <div class="btn-row">
-      <button class="btn btn-secondary" onclick="updatePreview()">🔄 Preview шинэчлэх</button>
       <button class="btn btn-success" onclick="downloadDocx()" id="downloadBtn">⬇️ DOCX татах</button>
     </div>
     <div id="statusMsg" class="status"></div>
@@ -240,7 +234,6 @@
     document.getElementById('typeInfo').style.display = 'block';
     document.getElementById('ownerCard').style.display = 'block';
     document.getElementById('propertyCard').style.display = 'block';
-    document.getElementById('previewCard').style.display = 'block';
     document.getElementById('actionCard').style.display = 'block';
 
     // Шимтгэлийн сонголт харуулах
@@ -269,7 +262,7 @@
       if (formData.name2) document.getElementById('name2').value = formData.name2;
       if (formData.register2) document.getElementById('register2').value = formData.register2;
     }
-    document.getElementById('name2').addEventListener('input', () => { document.getElementById('coownerSection').style.display='block'; debouncedPreview(); });
+    document.getElementById('name2').addEventListener('input', () => { document.getElementById('coownerSection').style.display='block';  });
     document.getElementById('register2').addEventListener('input', debouncedPreview);
 
     // duration байвал сонгох
@@ -284,14 +277,14 @@
       if (el) el.addEventListener('input', debouncedPreview);
     });
 
-    document.getElementById('startDate').addEventListener('change', () => { calcEndDate(); debouncedPreview(); });
-    document.getElementById('durationMonths').addEventListener('change', () => { calcEndDate(); debouncedPreview(); });
+    document.getElementById('startDate').addEventListener('change', () => { calcEndDate();  });
+    document.getElementById('durationMonths').addEventListener('change', () => { calcEndDate();  });
 
     // contractNumber байхгүй бол автоматаар авах
     if (!formData.contractNumber) fetchNextContractNumber();
 
     calcEndDate();
-    updatePreview();
+    
   }
 
   function calcEndDate() {
@@ -348,7 +341,7 @@
       const commission = Math.round(price * rate / 100);
       document.getElementById('commissionAmount').value = commission.toLocaleString('en-US') + ' ₮';
       resultGroup.style.display = 'flex';
-      updatePreview();
+      
     } else {
       resultGroup.style.display = 'none';
     }
