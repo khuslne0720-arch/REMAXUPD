@@ -151,12 +151,10 @@ async function claudeOCR(base64Image, mimeType) {
       'Content-Type': 'application/json',
       'x-api-key': process.env.ANTHROPIC_API_KEY,
       'anthropic-version': '2023-06-01',
-      'anthropic-beta': 'interleaved-thinking-2025-05-14'
     },
     body: JSON.stringify({
       model: 'claude-opus-4-5',
-      max_tokens: 8000,
-      thinking: { type: 'enabled', budget_tokens: 5000 },
+      max_tokens: 2048,
       messages: [{ role: 'user', content: [
         { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64Image } },
         { type: 'text', text: ocrPrompt }
