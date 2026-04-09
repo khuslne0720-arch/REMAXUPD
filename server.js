@@ -143,6 +143,7 @@ async function claudeOCR(base64Image, mimeType) {
     'Key font confusion pairs to watch:',
     '  Ц vs У (Ц has bottom-right tail), Т vs П (Т=1 stroke, П=2), Ү vs У (Ү has dots)',
     '  Ш vs Т, Ю vs И, Ц vs Ч, 2 vs 9, х vs т',
+    '  П vs Н — П has TWO vertical strokes with top bar. Н has crossbar in MIDDLE. "Пагваа" not "Нагваа".',
   ].join('\n');
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -312,8 +313,14 @@ app.post('/analyze', analyzeLimiter, upload.single('image'), async (req, res) =>
       if (certM) extracted.cert = certM[1].toUpperCase() + '-' + certM[2];
     }
 
-    // Нэрний алдаа засах — -зуус гэдэг Монгол нэрэнд байдаггүй, -цэцэг байх ёстой
-    const fixName = (n) => n ? n.replace(/зуус$/i, 'цэцэг').replace(/Зуус$/i, 'цэцэг') : n;
+    // Нэрний алдаа засах
+    const fixName = (n) => {
+      if (!n) return n;
+      n = n.replace(/зуус$/i, 'цэцэг').replace(/Зуус$/i, 'цэцэг'); // -зуус → -цэцэг
+      n = n.replace(/^Нагваа/, 'Пагваа'); // П→Н confusion
+      n = n.replace(/^Нагва /, 'Пагваа ');
+      return n;
+    };
     extracted.name  = fixName(extracted.name);
     extracted.name2 = fixName(extracted.name2);
 
