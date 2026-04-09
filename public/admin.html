@@ -58,6 +58,12 @@
   .badge-standard{background:rgba(107,117,133,.15);color:var(--muted)}
   .btn-danger{background:rgba(224,85,85,.1);color:var(--danger);border:1px solid rgba(224,85,85,.2);border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s}
   .btn-danger:hover{background:rgba(224,85,85,.2)}
+  input[type=checkbox]{width:15px;height:15px;accent-color:var(--accent);cursor:pointer}
+  .mls-input{background:transparent;border:none;border-bottom:1px dashed var(--border);color:var(--accent2);font-family:'DM Mono',monospace;font-size:12px;width:90px;padding:2px 4px;outline:none}
+  .mls-input:focus{border-bottom-color:var(--accent)}
+  .mls-input::placeholder{color:var(--muted)}
+  .mls-saved{color:var(--success);font-size:11px;margin-left:4px;display:none}
+  .filter-row{display:flex;gap:10px;align-items:center}
   .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#000;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:opacity .2s}
   .btn-primary:hover{opacity:.85}
   .agent-grid{padding:20px;display:flex;flex-direction:column;gap:12px}
@@ -134,11 +140,17 @@
     <div class="page" id="page-contracts">
       <div class="page-header">
         <div><div class="page-title">Гэрээнүүд</div><div class="page-sub">Бүх гэрээний жагсаалт</div></div>
-        <input class="search-box" placeholder="🔍 Хайх..." id="searchBox" oninput="filterContracts()">
+        <div class="filter-row">
+          <input class="search-box" placeholder="🔍 Гэрээний № хайх..." id="searchBox" oninput="filterContracts()" style="width:200px">
+          <input class="search-box" placeholder="👤 Нэр / РД хайх..." id="searchBox2" oninput="filterContracts()" style="width:180px">
+        </div>
       </div>
       <div class="card">
-        <table><thead><tr><th>Гэрээний №</th><th>Эзэмшигч</th><th>РД</th><th>Агент</th><th>Төрөл</th><th>Байршил</th><th>Огноо</th><th></th></tr></thead>
-        <tbody id="contractsTable"><tr><td colspan="8" class="empty-state">Ачаалж байна...</td></tr></tbody></table>
+        <table><thead><tr>
+          <th style="width:36px"><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)"></th>
+          <th>Гэрээний №</th><th>MLS</th><th>Эзэмшигч</th><th>РД</th><th>Агент</th><th>Төрөл</th><th>Байршил</th><th>Огноо</th><th></th>
+        </tr></thead>
+        <tbody id="contractsTable"><tr><td colspan="10" class="empty-state">Ачаалж байна...</td></tr></tbody></table>
       </div>
     </div>
 
@@ -261,11 +273,34 @@ function renderRecent(){
   tb.innerHTML=recent.map(c=>`<tr><td><span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--accent2)">${c.contractNumber||'—'}</span></td><td>${c.owner||'—'}</td><td>${c.agent||'—'}</td><td>${typeBadge(c.listingType)}</td><td style="color:var(--muted);font-size:12px">${formatDate(c.createdAt)}</td></tr>`).join('');
 }
 
+// MLS локал хадгалалт
+const mlsData = JSON.parse(localStorage.getItem('mls') || '{}');
+function saveMls(id, val) {
+  mlsData[id] = val;
+  localStorage.setItem('mls', JSON.stringify(mlsData));
+  const saved = document.getElementById('mls-saved-' + id);
+  if (saved) { saved.style.display = 'inline'; setTimeout(() => saved.style.display = 'none', 1500); }
+}
+function toggleSelectAll(cb) {
+  document.querySelectorAll('.row-cb').forEach(c => c.checked = cb.checked);
+}
+
 function renderContracts(data){
   const list=data||allContracts;
   const tb=document.getElementById('contractsTable');
-  if(!list.length){tb.innerHTML='<tr><td colspan="8" class="empty-state"><div class="big">📭</div>Гэрээ байхгүй</td></tr>';return}
-  tb.innerHTML=list.map(c=>`<tr><td><span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--accent2)">${c.contractNumber||'—'}</span></td><td style="font-weight:500">${c.owner||'—'}</td><td style="font-size:12px;color:var(--muted);font-family:'DM Mono',monospace">${c.register||'—'}</td><td>${c.agent||'—'}</td><td>${typeBadge(c.listingType)}</td><td style="font-size:12px;color:var(--muted);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.address||'—'}</td><td style="color:var(--muted);font-size:12px">${formatDate(c.createdAt)}</td><td><button class="btn-danger" onclick="deleteContract('${c.id}')">Устгах</button></td></tr>`).join('');
+  if(!list.length){tb.innerHTML='<tr><td colspan="10" class="empty-state"><div class="big">📭</div>Гэрээ байхгүй</td></tr>';return}
+  tb.innerHTML=list.map(c=>`<tr>
+    <td><input type="checkbox" class="row-cb" value="${c.id}"></td>
+    <td><span style="font-family:'DM Mono',monospace;font-size:12px;color:var(--accent2)">${c.contractNumber||'—'}</span></td>
+    <td><input class="mls-input" id="mls-${c.id}" placeholder="MLS №" value="${mlsData[c.id]||''}" onchange="saveMls('${c.id}',this.value)"><span class="mls-saved" id="mls-saved-${c.id}">✓</span></td>
+    <td style="font-weight:500">${c.owner||'—'}</td>
+    <td style="font-size:12px;color:var(--muted);font-family:'DM Mono',monospace">${c.register||'—'}</td>
+    <td>${c.agent||'—'}</td>
+    <td>${typeBadge(c.listingType)}</td>
+    <td style="font-size:12px;color:var(--muted);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.address||'—'}</td>
+    <td style="color:var(--muted);font-size:12px">${formatDate(c.createdAt)}</td>
+    <td><button class="btn-danger" onclick="deleteContract('${c.id}')">Устгах</button></td>
+  </tr>`).join('');
 }
 
 function renderAgents(){
@@ -279,9 +314,12 @@ function renderAgents(){
 }
 
 function filterContracts(){
-  const q=document.getElementById('searchBox').value.toLowerCase();
-  if(!q){renderContracts();return}
-  renderContracts(allContracts.filter(c=>[(c.contractNumber||''),(c.owner||''),(c.agent||''),(c.register||''),(c.address||'')].some(v=>v.toLowerCase().includes(q))));
+  const q=(document.getElementById('searchBox').value||'').toLowerCase();
+  const q2=(document.getElementById('searchBox2').value||'').toLowerCase();
+  let list=allContracts;
+  if(q) list=list.filter(c=>(c.contractNumber||'').toLowerCase().includes(q));
+  if(q2) list=list.filter(c=>[(c.owner||''),(c.register||''),(c.agent||'')].some(v=>v.toLowerCase().includes(q2)));
+  renderContracts(list);
 }
 
 function deleteContract(id){deleteTarget=id;document.getElementById('deleteModal').classList.add('show')}
