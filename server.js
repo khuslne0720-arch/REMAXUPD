@@ -221,6 +221,14 @@ function buildParsePrompt(rawText) {
     '  ДАГАВАР ДҮРЭМ: -зуус гэж дуусах нэр байдаггүй → -цэцэг болгон засах',
     '    Жишээ: Алтанзуус→Алтанцэцэг, Наранзуус→Наранцэцэг, Оюунзуус→Оюунцэцэг',
     '',
+    'MULTIPLE OWNERS RULES:',
+    '  FIRST owner → name + register',
+    '  SECOND owner only → name2 + register2',
+    '  3rd owner and beyond → IGNORED (no field for them)',
+    '  CRITICAL: name2 must contain EXACTLY ONE person\'s name (2 words max), never combine multiple owners into one field.',
+    '  Example (3 owners): "АмарЗаяа овгийн Пагваа Эрдэнэхүү ХП75092868, Монгол овгийн Эрдэнэхүү Золзаяа ТЗ81082305, Гөрөөлийн овгийн Гансүх Түвшинтөгс ГЮ80122512 /гурван иргэний өмч/"',
+    '  → name="Пагваа Эрдэнэхүү", register="ХП75092868", name2="Эрдэнэхүү Золзаяа", register2="ТЗ81082305", ownerCount="3"',
+    '',
     'register: exactly 2 Cyrillic uppercase letters + 8 digits. Example: ЦБ56050863, УТ06231710',
     'address: full address including дүүрэг, хороо, байр, тоот',
     'area: digits + м.кв before "талбайтай". Example: "43 м.кв"',
@@ -303,11 +311,15 @@ app.post('/analyze', analyzeLimiter, upload.single('image'), async (req, res) =>
     // Register regex шалгах: 2 Кирилл том үсэг + 8 цифр
     const fixRegister = (r) => {
       if (!r) return r;
-      // Мэдэгдэж буй confusion pair-үүд
+      // Мэдэгдэж буй confusion pair-үүд — угтвар үсгийн засвар
       r = r.replace(/^УП/, 'УТ');   // П→Т
       r = r.replace(/^ИЧ/, 'ИЦ');   // Ч→Ц
-      r = r.replace(/^УИ/, 'УЮ');   // И→Ю (УЮ08706152 гэх мэт)
-      // Regex-ээр зөв хэлбэрт оруулах: 2 том Кирилл + 8 цифр
+      r = r.replace(/^УИ/, 'УЮ');   // И→Ю
+      r = r.replace(/^ШЗ/, 'ТЗ');   // Ш→Т (энэ фонтод Ш, Т төстэй)
+      r = r.replace(/^ШИ/, 'ТИ');
+      r = r.replace(/^ШО/, 'ТО');
+      r = r.replace(/^ШБ/, 'ТБ');
+      // Regex: 2 том Кирилл + 8 цифр
       const m = r.match(/([А-ЯӨҮЁа-яөүё]{2})(\d{8})/u);
       return m ? (m[1].toUpperCase() + m[2]) : r;
     };
