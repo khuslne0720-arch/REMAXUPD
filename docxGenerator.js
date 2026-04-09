@@ -49,8 +49,9 @@ async function generateDocx(template, data, type, subtype) {
     agent:              data.agent              || '',
     residentialAddress: data.residentialAddress || '',
     commissionRate:     data.commissionRate     || '',
-    commissionAmount:   data.commissionAmount   || '',
+    commissionAmount:   (data.commissionAmount  || '').replace(/[₮\s]/g, '').replace(/,/g, ''),
     purpose:            data.purpose            || '',
+    rooms:              data.rooms              || '',
   });
 
   return doc.getZip().generate({ type: 'nodebuffer', compression: 'DEFLATE' });
