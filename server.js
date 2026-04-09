@@ -390,6 +390,11 @@ app.post('/generate', generateLimiter, async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="contract_${type}_${subtype}.docx"`);
     res.send(docBuffer);
   } catch (err) {
+    // Docxtemplater multi-error дэлгэрэнгүй харуулах
+    if (err.properties && err.properties.errors) {
+      const details = err.properties.errors.map(e => e.properties?.explanation || e.message).join('; ');
+      return res.status(500).json({ error: 'Template error: ' + details });
+    }
     res.status(500).json({ error: 'Failed: ' + err.message });
   }
 });
