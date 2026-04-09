@@ -378,6 +378,7 @@ app.post('/generate', generateLimiter, async (req, res) => {
       propertyId:     data.propertyId     ?? data.cert ?? '',
       listingType:    `${type} / ${subtype}`,
       area:           data.area           ?? '',
+      rooms:          data.rooms          ?? '',
       address:        data.address        ?? '',
       owner:          data.name           ?? '',
       register:       data.register       ?? '',
@@ -421,6 +422,7 @@ app.get('/admin/export-excel', adminLimiter, requireAdmin, (req, res) => {
     'ҮХХ дугаар':                c.propertyId     ?? '',
     'Листингийн төрөл':          c.listingType    ?? '',
     'Талбайн хэмжээ':            c.area           ?? '',
+    'Өрөөний тоо':               c.rooms          ?? '',
     'Листингийн байршил':        c.address        ?? '',
     'ҮХХ эзэмшигчийн мэдээлэл': c.owner          ?? '',
     'РД':                        c.register       ?? '',
@@ -429,7 +431,7 @@ app.get('/admin/export-excel', adminLimiter, requireAdmin, (req, res) => {
   const worksheet = xlsx.utils.json_to_sheet(rows);
   worksheet['!cols'] = [
     { wch: 18 }, { wch: 16 }, { wch: 12 }, { wch: 12 }, { wch: 14 },
-    { wch: 18 }, { wch: 16 }, { wch: 30 }, { wch: 28 }, { wch: 12 },
+    { wch: 18 }, { wch: 14 }, { wch: 10 }, { wch: 30 }, { wch: 28 }, { wch: 12 },
   ];
   xlsx.utils.book_append_sheet(workbook, worksheet, 'Гэрээнүүд');
   const buffer   = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
