@@ -453,17 +453,17 @@ app.get('/next-contract-number', (req, res) => {
   const { type, subtype } = req.query;
   
   const config = {
-    'sell_exclusive': { prefix: 'ОХ', startAt: 200 },
-    'sell_standard':  { prefix: 'ЭХ', startAt: 400 },
-    'rent_exclusive': { prefix: 'ОТ', startAt: 300 },
-    'rent_standard':  { prefix: 'ЭТ', startAt: 200 },
+    'sell_exclusive': { prefix: 'ОХ', startAt: 3 },
+    'sell_standard':  { prefix: 'ЭХ', startAt: 30 },
+    'rent_exclusive': { prefix: 'ОТ', startAt: 1 },
+    'rent_standard':  { prefix: 'ЭТ', startAt: 15 },
   };
 
   const key = `${type}_${subtype}`;
   const { prefix, startAt } = config[key] || { prefix: 'ГЭ', startAt: 400 };
   const year = new Date().getFullYear().toString().slice(-2);
   const contracts = readContracts().filter(c => c.listingType === `${type} / ${subtype}`);
-  const next = String(contracts.length + startAt).padStart(4, '0');
+  const next = String(contracts.length + startAt).padStart(3, '0');
   
   res.json({ contractNumber: `${prefix}${year}/${next}` });
 });
