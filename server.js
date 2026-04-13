@@ -453,8 +453,8 @@ app.get('/next-contract-number', (req, res) => {
   const { type, subtype } = req.query;
   
   const config = {
-    'sell_exclusive': { prefix: 'ОХ', startAt: 3 },
-    'sell_standard':  { prefix: 'ЭХ', startAt: 30 },
+    'sell_exclusive': { prefix: 'ОХ', startAt: 32 },
+    'sell_standard':  { prefix: 'ЭХ', startAt: 32 },
     'rent_exclusive': { prefix: 'ОТ', startAt: 1 },
     'rent_standard':  { prefix: 'ЭТ', startAt: 15 },
   };
