@@ -503,6 +503,38 @@ app.post('/preview', generateLimiter, requireSiteKey, (req, res) => {
 app.get('/admin/contracts', adminLimiter, requireAdmin, (req, res) => {
   res.json(readContracts());
 });
+
+// Admin: гэрээ засах
+app.put('/admin/contracts/:id', adminLimiter, requireAdmin, (req, res) => {
+  const contracts = readContracts();
+  const idx = contracts.findIndex(c => c.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'Олдсонгүй' });
+  const allowed = ['contractNumber','agent','startDate','endDate','owner','register','phone','address','area','rooms','purpose','listingType'];
+  allowed.forEach(k => { if (req.body[k] !== undefined) contracts[idx][k] = req.body[k]; });
+  writeContracts(contracts);
+  res.json({ ok: true });
+});
+
+// Admin: гэрээ татах (.docx)
+app.get('/admin/contracts/:id/download', adminLimiter, requireAdmin, async (req, res) => {
+  try {
+    const c = readContracts().find(c => c.id === req.params.id);
+    if (!c) return res.status(404).json({ error: 'Олдсонгүй' });
+    const [type, subtype] = (c.listingType || 'sell / standard').split(' / ').map(s => s.trim());
+    const { getTemplate } = require('./templates');
+    const template = getTemplate(type, subtype);
+    if (!template) return res.status(404).json({ error: 'Template олдсонгүй' });
+    const { generateDocx } = require('./docxGenerator');
+    const docBuffer = await generateDocx(template, c, type, subtype);
+    const filename = `contract_${c.contractNumber || c.id}.docx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(docBuffer);
+  } catch(err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Admin: гэрээ устгах
 app.delete('/admin/contracts/:id', adminLimiter, requireAdmin, (req, res) => {
   const contracts = readContracts().filter(c => c.id !== req.params.id);
@@ -543,21 +575,43 @@ app.get('/admin/export-excel', adminLimiter, requireAdmin, (req, res) => {
 });
 app.get('/next-contract-number', generateLimiter, requireSiteKey, (req, res) => {
   const { type, subtype } = req.query;
-  
+
   const config = {
-    'sell_exclusive': { prefix: 'ОХ', startAt: 32 },
-    'sell_standard':  { prefix: 'ЭХ', startAt: 32 },
-    'rent_exclusive': { prefix: 'ОТ', startAt: 1 },
+    'sell_exclusive': { prefix: 'ОХ', startAt: 35 },
+    'sell_standard':  { prefix: 'ЭХ', startAt: 40 },
+    'rent_exclusive': { prefix: 'ОТ', startAt: 1  },
     'rent_standard':  { prefix: 'ЭТ', startAt: 15 },
   };
 
   const key = `${type}_${subtype}`;
-  const { prefix, startAt } = config[key] || { prefix: 'ГЭ', startAt: 400 };
+  const { prefix, startAt } = config[key] || { prefix: 'ГЭ', startAt: 1 };
   const year = new Date().getFullYear().toString().slice(-2);
+  const pad = 3;
   const contracts = readContracts().filter(c => c.listingType === `${type} / ${subtype}`);
-  const next = String(contracts.length + startAt).padStart(3, '0');
-  
-  res.json({ contractNumber: `${prefix}${year}/${next}` });
+
+  // Хэрэглэгдсэн дугааруудыг цуглуулах
+  const usedNums = new Set();
+  let maxNum = startAt - 1;
+  contracts.forEach(c => {
+    if (c.contractNumber) {
+      const m = c.contractNumber.match(/\/(\d+)$/);
+      if (m) {
+        const n = parseInt(m[1], 10);
+        usedNums.add(n);
+        if (n > maxNum) maxNum = n;
+      }
+    }
+  });
+
+  // Устгасан (gap) дугааруудаас хамгийн бага нэгийг хайх
+  let next = null;
+  for (let i = startAt; i <= maxNum; i++) {
+    if (!usedNums.has(i)) { next = i; break; }
+  }
+  // Gap байхгүй бол max + 1
+  if (next === null) next = maxNum + 1;
+
+  res.json({ contractNumber: `${prefix}${year}/${String(next).padStart(pad, '0')}` });
 });
 app.listen(process.env.PORT || 3000, () => {
   console.log(`Server running on port ${process.env.PORT || 3000}`);
