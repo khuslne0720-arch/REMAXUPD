@@ -143,6 +143,7 @@
         <div class="filter-row">
           <input class="search-box" placeholder="🔍 Гэрээний № хайх..." id="searchBox" oninput="filterContracts()" style="width:200px">
           <input class="search-box" placeholder="👤 Нэр / РД хайх..." id="searchBox2" oninput="filterContracts()" style="width:180px">
+          <button onclick="deleteSelectedContracts()" style="padding:7px 14px;border-radius:8px;border:none;background:#fee2e2;color:#dc2626;font-size:13px;font-weight:500;cursor:pointer">🗑️ Сонгосныг устгах</button>
         </div>
       </div>
       <div class="card">
@@ -169,6 +170,20 @@
     <div class="modal-btns">
       <button class="btn-cancel" onclick="closeModal()">Болих</button>
       <button class="btn-confirm-del" onclick="confirmDelete()">Устгах</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="editModal" style="display:none">
+  <div class="modal" style="max-width:420px;max-height:80vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3 style="margin:0">Гэрээ засах</h3>
+      <button onclick="closeEditModal()" style="background:none;border:none;font-size:20px;cursor:pointer">✕</button>
+    </div>
+    <div id="editModalBody"></div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button onclick="closeEditModal()" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--surface);cursor:pointer">Болих</button>
+      <button onclick="saveEdit()" style="flex:1;padding:10px;border-radius:8px;border:none;background:var(--accent2);color:#fff;font-weight:600;cursor:pointer">Хадгалах</button>
     </div>
   </div>
 </div>
@@ -299,7 +314,13 @@ function renderContracts(data){
     <td>${typeBadge(c.listingType)}</td>
     <td style="font-size:12px;color:var(--muted);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.address||'—'}</td>
     <td style="color:var(--muted);font-size:12px">${formatDate(c.createdAt)}</td>
-    <td><button class="btn-danger" onclick="deleteContract('${c.id}')">Устгах</button></td>
+    <td>
+      <div style="display:flex;gap:4px">
+        <button class="btn-danger" onclick="deleteContract('${c.id}')">Устгах</button>
+        <button onclick="downloadContract('${c.id}','${(c.contractNumber||'contract').replace(/'/g,"\\'")}\')" style="padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);font-size:11px;cursor:pointer">📥</button>
+        <button onclick="editContract('${c.id}')" style="padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);font-size:11px;cursor:pointer">✏️</button>
+      </div>
+    </td>
   </tr>`).join('');
 }
 
@@ -329,9 +350,92 @@ async function confirmDelete(){
   if(!deleteTarget)return;
   try{
     const r=await fetch('/admin/contracts/'+deleteTarget,{method:'DELETE',headers:{'x-admin-token':adminToken}});
-    if(r.ok){showToast('✅ Гэрээ устгагдлаа','success');closeModal();loadData()}
+    if(r.ok){showToast('✅ Гэрээ устгагдлаа','success');closeModal();await loadData();filterContracts()}
     else showToast('❌ Устгахад алдаа','error');
   }catch(e){showToast('❌ Алдаа гарлаа','error')}
+}
+
+// ── Гэрээ татах (.docx) ──
+async function downloadContract(id, contractNumber) {
+  try {
+    const r = await fetch('/admin/contracts/'+id+'/download', { headers: { 'x-admin-token': adminToken } });
+    if (!r.ok) { showToast('❌ Татахад алдаа', 'error'); return; }
+    const blob = await r.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${contractNumber || id}.docx`;
+    a.click();
+    showToast('✅ Татагдлаа', 'success');
+  } catch(e) { showToast('❌ Алдаа', 'error'); }
+}
+
+// ── Гэрээ засах ──
+let editingId = null;
+const EDIT_FIELDS = [
+  ['contractNumber', 'Гэрээний дугаар'],
+  ['agent',          'Агент'],
+  ['startDate',      'Эхлэх огноо'],
+  ['endDate',        'Дуусах огноо'],
+  ['owner',          'Эзэмшигч'],
+  ['register',       'РД'],
+  ['phone',          'Утас'],
+  ['address',        'Хаяг'],
+  ['area',           'Талбай'],
+  ['rooms',          'Өрөө'],
+];
+
+function editContract(id) {
+  const c = allContracts.find(c => c.id === id);
+  if (!c) return;
+  editingId = id;
+  document.getElementById('editModalBody').innerHTML = EDIT_FIELDS.map(([k, l]) =>
+    `<div style="margin-bottom:8px">
+      <label style="font-size:11px;color:var(--muted);font-weight:500">${l}</label>
+      <input id="ef-${k}" value="${(c[k]||'').replace(/"/g,'&quot;')}" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px;background:var(--surface);color:var(--text);margin-top:2px;box-sizing:border-box" />
+    </div>`
+  ).join('');
+  document.getElementById('editModal').style.display = 'flex';
+}
+
+function closeEditModal() {
+  document.getElementById('editModal').style.display = 'none';
+  editingId = null;
+}
+
+async function saveEdit() {
+  if (!editingId) return;
+  const update = {};
+  EDIT_FIELDS.forEach(([k]) => { update[k] = document.getElementById('ef-'+k).value.trim(); });
+  try {
+    const r = await fetch('/admin/contracts/'+editingId, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken },
+      body: JSON.stringify(update)
+    });
+    if (r.ok) {
+      const idx = allContracts.findIndex(c => c.id === editingId);
+      if (idx !== -1) Object.assign(allContracts[idx], update);
+      closeEditModal();
+      filterContracts();
+      showToast('✅ Хадгалагдлаа', 'success');
+    } else showToast('❌ Алдаа', 'error');
+  } catch(e) { showToast('❌ Алдаа', 'error'); }
+}
+
+// ── Bulk delete ──
+async function deleteSelectedContracts() {
+  const ids = [...document.querySelectorAll('.row-cb:checked')].map(c => c.value);
+  if (!ids.length) { showToast('⚠️ Устгах гэрээ сонгоогүй', 'error'); return; }
+  if (!confirm(`${ids.length} гэрээг устгах уу?`)) return;
+  let ok = 0, fail = 0;
+  for (const id of ids) {
+    const r = await fetch('/admin/contracts/'+id, { method: 'DELETE', headers: { 'x-admin-token': adminToken } });
+    if (r.ok) ok++; else fail++;
+  }
+  showToast(`✅ ${ok} устгагдлаа${fail ? ` (${fail} алдаа)` : ''}`, ok > 0 ? 'success' : 'error');
+  document.getElementById('selectAll').checked = false;
+  await loadData();
+  filterContracts();
 }
 
 async function exportExcel(){
