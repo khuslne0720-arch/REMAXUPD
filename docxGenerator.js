@@ -17,6 +17,14 @@ function formatMN(dateStr) {
   return `${d.getFullYear()} оны ${d.getMonth()+1}-р сарын ${d.getDate()}`;
 }
 
+// Үнийг форматлах: 150000000 → 150,000,000
+function formatPrice(val) {
+  if (!val && val !== 0) return '';
+  const num = parseFloat(String(val).replace(/[,\s₮]/g, ''));
+  if (isNaN(num)) return String(val);
+  return num.toLocaleString('en-US');
+}
+
 async function generateDocx(template, data, type, subtype) {
   const templatePath = path.join(__dirname, 'templates', `${type}_${subtype}.docx`);
   if (!fs.existsSync(templatePath)) throw new Error(`Template файл олдсонгүй: ${type}_${subtype}.docx`);
@@ -45,11 +53,11 @@ async function generateDocx(template, data, type, subtype) {
     cert:           data.cert           || '',
     phone:          data.phone          || '',
     email:          data.email          || '',
-    price:          data.price          || '',
+    price:          formatPrice(data.price),
     agent:              data.agent              || '',
     residentialAddress: data.residentialAddress || '',
     commissionRate:     data.commissionRate     || '',
-    commissionAmount:   (data.commissionAmount  || '').replace(/[₮\s]/g, '').replace(/,/g, ''),
+    commissionAmount:   formatPrice((data.commissionAmount || '').replace(/[₮\s]/g, '').replace(/,/g, '')),
     purpose:            data.purpose            || '',
     rooms:              data.rooms              || '',
   });
