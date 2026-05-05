@@ -504,7 +504,7 @@
     form.append('image', selectedFile);
 
     try {
-      const res = await fetch('/analyze', { method: 'POST', body: form });
+      const res = await fetch('/analyze', { method: 'POST', body: form, headers: { 'x-site-key': 'REMAX_UP_2026' } });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Алдаа гарлаа');
 

@@ -224,7 +224,7 @@
   async function fetchNextContractNumber() {
     if (!type || !subtype) return;
     try {
-      const res = await fetch(`/next-contract-number?type=${type}&subtype=${subtype}`);
+      const res = await fetch(`/next-contract-number?type=${type}&subtype=${subtype}`, { headers: { 'x-site-key': 'REMAX_UP_2026' } });
       const json = await res.json();
       const el = document.getElementById('contractNumber');
       if (el && !el.value && json.contractNumber) {
@@ -357,7 +357,7 @@
     try {
       const res = await fetch('/preview', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-site-key': 'REMAX_UP_2026' },
         body: JSON.stringify({ type, subtype, data })
       });
       const result = await res.json();
@@ -382,7 +382,7 @@
     try {
       const res = await fetch('/generate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-site-key': 'REMAX_UP_2026' },
         body: JSON.stringify({ type, subtype, data })
       });
 
