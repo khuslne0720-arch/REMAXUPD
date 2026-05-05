@@ -88,6 +88,7 @@ app.use(helmet({
 const analyzeLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
+  validate: { xForwardedForHeader: false },
   message: { error: 'Хэт олон хүсэлт. 1 минут хүлээнэ үү.' }
 });
 
@@ -95,6 +96,7 @@ const analyzeLimiter = rateLimit({
 const generateLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 20,
+  validate: { xForwardedForHeader: false },
   message: { error: 'Хэт олон хүсэлт. 1 минут хүлээнэ үү.' }
 });
 
@@ -102,6 +104,7 @@ const generateLimiter = rateLimit({
 const adminLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 30,
+  validate: { xForwardedForHeader: false },
   message: { error: 'Хэт олон хүсэлт.' }
 });
 
