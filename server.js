@@ -4,6 +4,7 @@ const compression = require('compression');
 const multer = require('multer');
 const sharp = require('sharp');
 const fs = require('fs');
+const crypto = require('crypto');
 const { generateDocx } = require('./docxGenerator');
 const { getTemplate } = require('./templates');
 const path = require('path');
@@ -11,10 +12,77 @@ const xlsx = require('xlsx');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const app = express();
-const CONTRACTS_FILE = path.join(__dirname, 'contracts.json');
+
+// ── Env validation ──
+const REQUIRED_ENV = ['ADMIN_KEY', 'ANTHROPIC_API_KEY', 'SITE_KEY'];
+const missingEnv = REQUIRED_ENV.filter(k => !process.env[k]);
+if (missingEnv.length) {
+  console.error('[FATAL] Дутуу environment variables:', missingEnv.join(', '));
+  process.exit(1);
+}
+if (process.env.ADMIN_KEY.length < 12) {
+  console.error('[FATAL] ADMIN_KEY хамгийн багадаа 12 тэмдэгт байх ёстой!');
+  process.exit(1);
+}
+
+// ── Security log ──
+const SECURITY_LOG = process.env.SECURITY_LOG || path.join(__dirname, 'security.log');
+function securityLog(event, details) {
+  const line = `${new Date().toISOString()} [${event}] ${JSON.stringify(details)}\n`;
+  fs.appendFile(SECURITY_LOG, line, () => {});
+  console.log(`[SECURITY] ${event}`, details);
+}
+
+// ── Site-key middleware ──
+function requireSiteKey(req, res, next) {
+  if (req.headers['x-site-key'] !== process.env.SITE_KEY) {
+    if (req.file?.path) try { fs.unlinkSync(req.file.path); } catch (_) {}
+    securityLog('SITE_KEY_FAIL', { ip: req.ip, path: req.path });
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  next();
+}
+
+const CONTRACTS_FILE = process.env.CONTRACTS_FILE || path.join(__dirname, 'contracts.json');
+const CONTRACTS_DIR = path.dirname(CONTRACTS_FILE);
+if (!fs.existsSync(CONTRACTS_DIR)) fs.mkdirSync(CONTRACTS_DIR, { recursive: true });
+
+// ── AES-256-CBC шифрлэлт ──
+const ENC_KEY     = crypto.createHash('sha256').update(process.env.ENCRYPT_KEY || process.env.ADMIN_KEY || 'default').digest();
+const OLD_ENC_KEY = crypto.createHash('sha256').update(process.env.ADMIN_KEY   || 'default').digest();
+const IV_LEN = 16;
+
+function encrypt(text) {
+  const iv = crypto.randomBytes(IV_LEN);
+  const cipher = crypto.createCipheriv('aes-256-cbc', ENC_KEY, iv);
+  const enc = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()]);
+  return iv.toString('hex') + ':' + enc.toString('hex');
+}
+
+function tryDecryptWith(key, text) {
+  const [ivHex, encHex] = text.split(':');
+  const decipher = crypto.createDecipheriv('aes-256-cbc', key, Buffer.from(ivHex, 'hex'));
+  return Buffer.concat([decipher.update(Buffer.from(encHex, 'hex')), decipher.final()]).toString('utf8');
+}
+
+function decrypt(text) {
+  try { return tryDecryptWith(ENC_KEY, text); } catch (_) {}
+  try {
+    const plain = tryDecryptWith(OLD_ENC_KEY, text);
+    fs.writeFileSync(CONTRACTS_FILE, encrypt(plain), 'utf-8');
+    return plain;
+  } catch (_) {}
+  throw new Error('Decrypt failed');
+}
 
 // ── Аюулгүй байдал ──
-app.use(helmet({ contentSecurityPolicy: false }));
+app.set('trust proxy', 1);
+app.use(helmet({
+  contentSecurityPolicy: false,
+  hsts: { maxAge: 31536000, includeSubDomains: true },
+  frameguard: { action: 'deny' },
+  noSniff: true,
+}));
 
 // Analyze: 1 минутад 10 удаа
 const analyzeLimiter = rateLimit({
@@ -39,11 +107,12 @@ const adminLimiter = rateLimit({
 
 // ── Middleware ──
 app.use(compression());
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 app.use(express.static('public'));
 
 // ── Admin Session ──
-const crypto = require('crypto');
+const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 const sessions = new Map();
 const loginAttempts = new Map();
 
@@ -68,25 +137,28 @@ function requireAdmin(req, res, next) {
   const token = req.headers['x-admin-token'];
   if (!token || !sessions.has(token)) return res.status(401).json({ error: 'Нэвтрээгүй байна.' });
   const session = sessions.get(token);
-  if (Date.now() - session.createdAt > 8 * 60 * 60 * 1000) { sessions.delete(token); return res.status(401).json({ error: 'Session дууссан.' }); }
+  if (Date.now() - session.createdAt > SESSION_TTL_MS) { sessions.delete(token); return res.status(401).json({ error: 'Session дууссан.' }); }
   next();
 }
 
 app.post('/admin/login', adminLimiter, (req, res) => {
   const { key } = req.body || {};
   const ip = req.ip;
-  if (isLockedOut(ip)) return res.status(429).json({ error: '5 удаа буруу оруулсан. 15 минут хүлээнэ үү.' });
+  if (isLockedOut(ip)) {
+    securityLog('LOGIN_LOCKED', { ip });
+    return res.status(429).json({ error: '5 удаа буруу оруулсан. 15 минут хүлээнэ үү.' });
+  }
   if (key !== process.env.ADMIN_KEY) {
     recordFailedLogin(ip);
     const a = loginAttempts.get(ip);
     const remaining = 5 - (a?.count || 0);
-    console.log(`[SECURITY] Буруу нууц үг: ${ip}`);
+    securityLog('LOGIN_FAIL', { ip, attemptsLeft: remaining });
     return res.status(403).json({ error: `Түлхүүр буруу байна. ${remaining} оролдлого үлдсэн.` });
   }
   loginAttempts.delete(ip);
   const token = generateToken();
   sessions.set(token, { ip, createdAt: Date.now() });
-  console.log(`[SECURITY] Admin нэвтэрлээ: ${ip}`);
+  securityLog('LOGIN_SUCCESS', { ip });
   res.json({ token });
 });
 
@@ -98,20 +170,40 @@ app.post('/admin/logout', (req, res) => {
 
 function readContracts() {
   if (!fs.existsSync(CONTRACTS_FILE)) return [];
-  try { return JSON.parse(fs.readFileSync(CONTRACTS_FILE, 'utf-8')); }
-  catch { return []; }
+  try {
+    const raw = fs.readFileSync(CONTRACTS_FILE, 'utf-8').trim();
+    if (!raw) return [];
+    // Хуучин шифрлэгдээгүй JSON → автомат migrate
+    if (raw.startsWith('[') || raw.startsWith('{')) {
+      const data = JSON.parse(raw);
+      try { fs.writeFileSync(CONTRACTS_FILE, encrypt(JSON.stringify(data)), 'utf-8'); } catch (_) {}
+      return data;
+    }
+    return JSON.parse(decrypt(raw));
+  } catch { return []; }
 }
 
 function saveContract(contractData) {
   const contracts = readContracts();
   contracts.push(contractData);
-  fs.writeFileSync(CONTRACTS_FILE, JSON.stringify(contracts, null, 2), 'utf-8');
+  fs.writeFileSync(CONTRACTS_FILE, encrypt(JSON.stringify(contracts)), 'utf-8');
 }
 
 function writeContracts(data) {
-  fs.writeFileSync(CONTRACTS_FILE, JSON.stringify(data, null, 2), 'utf-8');
+  fs.writeFileSync(CONTRACTS_FILE, encrypt(JSON.stringify(data)), 'utf-8');
 }
-const upload = multer({ dest: 'uploads/', limits: { fileSize: 20 * 1024 * 1024 } });
+const ALLOWED_IMAGE_MIMES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+const upload = multer({
+  dest: 'uploads/',
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (!ALLOWED_IMAGE_MIMES.includes(file.mimetype)) {
+      securityLog('UPLOAD_REJECT_MIME', { ip: req.ip, mime: file.mimetype });
+      return cb(new Error('Зөвхөн зураг хүлээн авна (jpg, png, webp, heic)'));
+    }
+    cb(null, true);
+  }
+});
 
 // ── Google Vision OCR (GOOGLE_VISION_KEY байвал ашиглана) ──
 async function googleVisionOCR(base64Image) {
@@ -156,7 +248,7 @@ async function claudeOCR(base64Image, mimeType) {
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-opus-4-5',
+      model: 'claude-sonnet-4-6',
       max_tokens: 2048,
       messages: [{ role: 'user', content: [
         { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64Image } },
@@ -232,7 +324,7 @@ function buildParsePrompt(rawText) {
     'Return ONLY the JSON object, no explanation.',
   ].join('\n');
 }
-app.post('/analyze', analyzeLimiter, upload.single('image'), async (req, res) => {
+app.post('/analyze', analyzeLimiter, requireSiteKey, upload.single('image'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No image uploaded' });
   try {
     let imageBuffer = fs.readFileSync(req.file.path);
@@ -271,7 +363,7 @@ app.post('/analyze', analyzeLimiter, upload.single('image'), async (req, res) =>
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
-        model: 'claude-opus-4-5',
+        model: 'claude-sonnet-4-6',
         max_tokens: 1024,
         messages: [{ role: 'user', content: parsePrompt }]
       })
@@ -337,7 +429,7 @@ app.post('/analyze', analyzeLimiter, upload.single('image'), async (req, res) =>
     res.status(500).json({ error: 'Failed: ' + err.message });
   }
 });
-app.post('/parse-text', async (req, res) => {
+app.post('/parse-text', analyzeLimiter, requireSiteKey, async (req, res) => {
   const { rawText } = req.body;
   if (!rawText) return res.status(400).json({ error: 'rawText missing' });
   try {
@@ -345,7 +437,7 @@ app.post('/parse-text', async (req, res) => {
     const parseResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: 'claude-opus-4-5', max_tokens: 1024, messages: [{ role: 'user', content: parsePrompt }] })
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1024, messages: [{ role: 'user', content: parsePrompt }] })
     });
     const parseData = await parseResponse.json();
     if (parseData.error) throw new Error(parseData.error.message);
@@ -361,7 +453,7 @@ app.post('/parse-text', async (req, res) => {
   }
 });
 
-app.post('/generate', generateLimiter, async (req, res) => {
+app.post('/generate', generateLimiter, requireSiteKey, async (req, res) => {
   const { type, subtype, data } = req.body;
   if (!type || !subtype || !data) return res.status(400).json({ error: 'Missing fields' });
   try {
@@ -399,7 +491,7 @@ app.post('/generate', generateLimiter, async (req, res) => {
   }
 });
 
-app.post('/preview', (req, res) => {
+app.post('/preview', generateLimiter, requireSiteKey, (req, res) => {
   const { type, subtype, data } = req.body;
   if (!type || !subtype || !data) return res.status(400).json({ error: 'Missing fields' });
   const template = getTemplate(type, subtype);
@@ -411,6 +503,38 @@ app.post('/preview', (req, res) => {
 app.get('/admin/contracts', adminLimiter, requireAdmin, (req, res) => {
   res.json(readContracts());
 });
+
+// Admin: гэрээ засах
+app.put('/admin/contracts/:id', adminLimiter, requireAdmin, (req, res) => {
+  const contracts = readContracts();
+  const idx = contracts.findIndex(c => c.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'Олдсонгүй' });
+  const allowed = ['contractNumber','agent','startDate','endDate','owner','register','phone','address','area','rooms','purpose','listingType'];
+  allowed.forEach(k => { if (req.body[k] !== undefined) contracts[idx][k] = req.body[k]; });
+  writeContracts(contracts);
+  res.json({ ok: true });
+});
+
+// Admin: гэрээ татах (.docx)
+app.get('/admin/contracts/:id/download', adminLimiter, requireAdmin, async (req, res) => {
+  try {
+    const c = readContracts().find(c => c.id === req.params.id);
+    if (!c) return res.status(404).json({ error: 'Олдсонгүй' });
+    const [type, subtype] = (c.listingType || 'sell / standard').split(' / ').map(s => s.trim());
+    const { getTemplate } = require('./templates');
+    const template = getTemplate(type, subtype);
+    if (!template) return res.status(404).json({ error: 'Template олдсонгүй' });
+    const { generateDocx } = require('./docxGenerator');
+    const docBuffer = await generateDocx(template, c, type, subtype);
+    const filename = `contract_${c.contractNumber || c.id}.docx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(docBuffer);
+  } catch(err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Admin: гэрээ устгах
 app.delete('/admin/contracts/:id', adminLimiter, requireAdmin, (req, res) => {
   const contracts = readContracts().filter(c => c.id !== req.params.id);
@@ -449,22 +573,90 @@ app.get('/admin/export-excel', adminLimiter, requireAdmin, (req, res) => {
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.send(buffer);
 });
-app.get('/next-contract-number', (req, res) => {
+app.get('/next-contract-number', generateLimiter, requireSiteKey, (req, res) => {
   const { type, subtype } = req.query;
-  
+
   const config = {
-    'sell_exclusive': { prefix: 'ОХ', startAt: 32 },
-    'sell_standard':  { prefix: 'ЭХ', startAt: 32 },
-    'rent_exclusive': { prefix: 'ОТ', startAt: 1 },
+    'sell_exclusive': { prefix: 'ОХ', startAt: 35 },
+    'sell_standard':  { prefix: 'ЭХ', startAt: 40 },
+    'rent_exclusive': { prefix: 'ОТ', startAt: 1  },
     'rent_standard':  { prefix: 'ЭТ', startAt: 15 },
   };
 
   const key = `${type}_${subtype}`;
-  const { prefix, startAt } = config[key] || { prefix: 'ГЭ', startAt: 400 };
+  const { prefix, startAt } = config[key] || { prefix: 'ГЭ', startAt: 1 };
   const year = new Date().getFullYear().toString().slice(-2);
+  const pad = 3;
   const contracts = readContracts().filter(c => c.listingType === `${type} / ${subtype}`);
-  const next = String(contracts.length + startAt).padStart(3, '0');
-  
-  res.json({ contractNumber: `${prefix}${year}/${next}` });
+
+  // Хэрэглэгдсэн дугааруудыг цуглуулах
+  const usedNums = new Set();
+  let maxNum = startAt - 1;
+  contracts.forEach(c => {
+    if (c.contractNumber) {
+      const m = c.contractNumber.match(/\/(\d+)$/);
+      if (m) {
+        const n = parseInt(m[1], 10);
+        usedNums.add(n);
+        if (n > maxNum) maxNum = n;
+      }
+    }
+  });
+
+  // Устгасан (gap) дугааруудаас хамгийн бага нэгийг хайх
+  let next = null;
+  for (let i = startAt; i <= maxNum; i++) {
+    if (!usedNums.has(i)) { next = i; break; }
+  }
+  // Gap байхгүй бол max + 1
+  if (next === null) next = maxNum + 1;
+
+  res.json({ contractNumber: `${prefix}${year}/${String(next).padStart(pad, '0')}` });
 });
-app.listen(process.env.PORT || 3000, () => console.log('Server running at http://localhost:3001'));
+app.listen(process.env.PORT || 3000, () => {
+  console.log(`Server running on port ${process.env.PORT || 3000}`);
+  console.log('[STARTUP] Site-key, env validation OK');
+
+  // ── Background cleanup ──
+  // Session cleanup
+  setInterval(() => {
+    const now = Date.now();
+    for (const [token, session] of sessions.entries()) {
+      if (now - session.createdAt > SESSION_TTL_MS) sessions.delete(token);
+    }
+  }, 10 * 60 * 1000);
+
+  // Login attempts cleanup
+  setInterval(() => {
+    const now = Date.now();
+    for (const [ip, a] of loginAttempts.entries()) {
+      if (a.lockedUntil && now >= a.lockedUntil) loginAttempts.delete(ip);
+    }
+  }, 5 * 60 * 1000);
+
+  // Uploads cleanup (1 цагийн дараа)
+  function cleanupUploads() {
+    const dir = path.join(__dirname, 'uploads');
+    if (!fs.existsSync(dir)) return;
+    const cutoff = Date.now() - 60 * 60 * 1000;
+    try {
+      fs.readdirSync(dir).forEach(f => {
+        try {
+          const fp = path.join(dir, f);
+          if (fs.statSync(fp).mtimeMs < cutoff) fs.unlinkSync(fp);
+        } catch (_) {}
+      });
+    } catch (_) {}
+  }
+  setInterval(cleanupUploads, 30 * 60 * 1000);
+  cleanupUploads();
+});
+
+// ── Multer error handler ──
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    return res.status(err.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({ error: err.message });
+  }
+  if (err?.message?.includes('Зөвхөн зураг')) return res.status(400).json({ error: err.message });
+  next(err);
+});
