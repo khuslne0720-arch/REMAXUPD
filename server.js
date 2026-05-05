@@ -663,3 +663,4 @@ app.use((err, req, res, next) => {
   if (err?.message?.includes('Зөвхөн зураг')) return res.status(400).json({ error: err.message });
   next(err);
 });
+ 
