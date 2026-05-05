@@ -529,9 +529,9 @@ app.get('/admin/contracts/:id/download', adminLimiter, requireAdmin, async (req,
     if (!template) return res.status(404).json({ error: 'Template олдсонгүй' });
     const { generateDocx } = require('./docxGenerator');
     const docBuffer = await generateDocx(template, c, type, subtype);
-    const filename = `contract_${c.contractNumber || c.id}.docx`;
+    const filename = `contract_${(c.contractNumber || c.id).replace(/[^\w\-\.]/g, '_')}.docx`;
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`);
     res.send(docBuffer);
   } catch(err) {
     res.status(500).json({ error: err.message });
